@@ -18,6 +18,7 @@
 
 #include <string>
 #include <vector>
+#include <iomanip>
 #include <sstream>
 #include <stdio.h>
 #include <stdlib.h>
@@ -28,6 +29,7 @@
 #include <examples/imgui_impl_opengl3.h>
 
 #include "pcsx2defs.h"
+#include "pcsx2disassemble.h"
 
 struct Snapshot
 {
@@ -164,9 +166,11 @@ void memory_window(AppState &app)
 void disassembly_window(AppState &app)
 {
 	Snapshot &current = app.snapshots[app.current_snapshot];
-	std::vector<std::string> &listing = app.disassemblies[current.disassembly];
-	for(std::string &line : listing) {
-		ImGui::Text("%s", line.c_str());
+	for(std::size_t i = 0; i < VU1_PROGSIZE; i += 4) {
+		std::stringstream line;
+		line << std::hex << std::setw(8) << std::setfill('0') << i << ": ";
+		line << disassemble_lower(*(u32*) &current.program[i], i);
+		ImGui::Text("%s", line.str().c_str());
 	}
 }
 
@@ -204,42 +208,6 @@ std::vector<Snapshot> parse_trace(AppState &app, std::string dir_path)
 		//memset(&current.registers + hack_size, 0, 0x10);
 		memcpy(current.memory, buffer + mem_pos, VU1_MEMSIZE);
 		memcpy(current.program, buffer + prog_pos, VU1_PROGSIZE);
-		std::vector<std::string> listing;
-		fseek(trace, 0x10, SEEK_CUR); // Skip "DISASSEMBLY====="
-		while(1) {
-			if(feof(trace)) {
-				break;
-			}
-			
-			char signature[0x10];
-			fread(signature, 0x10, 1, trace);
-			fseek(trace, -0x10, SEEK_CUR);
-			if(memcmp(signature, "REGISTERS=======", 0x10) == 0) {
-				break;
-			}
-			
-			char disasm[256];
-			memset(disasm, '\0', 256);
-			int i;
-			for(i = 0; i < 255; i++) {
-				char next = fgetc(trace);
-				if(feof(trace) || next == '\0') {
-					break;
-				} else {
-					disasm[i] = next;
-				}
-			}
-			if(i != 255) {
-				while(!feof(trace) && fgetc(trace) != '\0');
-			}
-			listing.push_back(disasm);
-		}
-		
-		if(app.disassemblies.size() < 1 ||
-				!std::equal(listing.begin(), listing.end(), app.disassemblies.back().begin())) {
-			app.disassemblies.push_back(listing);
-		}
-		current.disassembly = app.disassemblies.size() - 1;
 		snapshots.push_back(current);
 	}
 	if(!feof(trace)) {

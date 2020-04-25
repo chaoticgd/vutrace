@@ -14,6 +14,9 @@
  *  If not, see <http://www.gnu.org/licenses/>.
  */
 
+#ifndef PCSX2_DEFS
+#define PCSX2_DEFS
+
 #include <stdint.h>
 
 static const uint VU1_MEMSIZE	= 0x4000;		// 16kb
@@ -144,3 +147,5 @@ struct VURegs
 	efuPipe efu;
 	ialuPipe ialu[8];
 };
+
+#endif

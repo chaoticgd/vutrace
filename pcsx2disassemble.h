@@ -87,7 +87,7 @@ void mVUunknown(std::string &result, uint32_t insn, uint32_t pc)
 
 static inline u32 branchAddr(uint32_t insn, uint32_t pc)
 {
-	return ((((pc + 2) + (_Imm11_ * 2)) & VU1_PROGSIZE) * 4);
+	return ((((pc / 4 + 2) + (_Imm11_ * 2)) & (VU1_PROGSIZE / 4 - 1)) * 4);
 }
 
 // ======== LOWER INSTRUCTIONS ========

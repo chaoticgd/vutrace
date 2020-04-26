@@ -145,19 +145,51 @@ void registers_window(AppState &app)
 void memory_window(AppState &app)
 {
 	Snapshot &current = app.snapshots[app.current_snapshot];
+	Snapshot *last;
+	if(app.current_snapshot > 0) {
+		last = &app.snapshots[app.current_snapshot - 1];
+	} else {
+		last = &current;
+	}
 	
 	static const int ROW_SIZE = 32;
 	
-	if(ImGui::BeginChild("##rows")) {
+	if(ImGui::BeginChild("##rows", ImVec2(0, (VU1_MEMSIZE / ROW_SIZE) * 18))) {
+		ImDrawList *dl = ImGui::GetWindowDrawList();
+		
 		for(int i = 0; i < VU1_MEMSIZE / ROW_SIZE; i++) {
 			u8 *data = current.memory + i * ROW_SIZE;
-			std::stringstream line;
+			u8 *last_data = last->memory + i * ROW_SIZE;
 			for(int j = 0; j < ROW_SIZE; j++) {
-				int val = data[j] & 0xff;
-				if(val < 0x10) line << "0";
-				line << std::hex << val << " ";
+				int val = data[j];
+				std::stringstream hex;
+				if(val < 0x10) hex << "0";
+				hex << std::hex << val;
+				
+				ImVec2 hex_pos {
+					ImGui::GetItemRectMin().x + (j * 5) / 4 * 18.f,
+					ImGui::GetItemRectMin().y + i * 18.f
+				};
+				ImColor hex_col = ImColor(0.8f, 0.8f, 0.8f);
+				if(val != last_data[j]) {
+					hex_col = ImColor(1.f, 0.5f, 0.5f);
+				}
+				dl->AddText(hex_pos, hex_col, hex.str().c_str());
 			}
-			ImGui::Text("%s", line.str().c_str());
+			
+			for(int j = 0; j < ROW_SIZE; j += 4) {	
+				std::stringstream fp;
+				fp << *(float*) &data[j];
+				ImVec2 fp_pos {
+					ImGui::GetItemRectMin().x + ((ROW_SIZE + j + 1) * 5) / 4 * 18.f,
+					ImGui::GetItemRectMin().y + i * 18.f
+				};
+				ImColor fp_col = ImColor(0.8f, 0.8f, 0.8f);
+				if(*(float*) &data[j] != *(float*) &last_data[j]) {
+					fp_col = ImColor(1.f, 0.5f, 0.5f);
+				}
+				dl->AddText(fp_pos, fp_col, fp.str().c_str());
+			}
 		}
 		ImGui::EndChild();
 	}

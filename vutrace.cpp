@@ -166,11 +166,16 @@ void memory_window(AppState &app)
 void disassembly_window(AppState &app)
 {
 	Snapshot &current = app.snapshots[app.current_snapshot];
-	for(std::size_t i = 0; i < VU1_PROGSIZE; i += 4) {
-		std::stringstream line;
-		line << std::hex << std::setw(8) << std::setfill('0') << i << ": ";
-		line << disassemble_lower(*(u32*) &current.program[i], i);
-		ImGui::Text("%s", line.str().c_str());
+	for(std::size_t i = 0; i < VU1_PROGSIZE; i += 8) {
+		std::stringstream upper;
+		upper << std::hex << std::setw(8) << std::setfill('0') << i + 4 << ": ";
+		upper << disassemble_upper(*(u32*) &current.program[i + 4], i + 4);
+		ImGui::Text("%s", upper.str().c_str());
+		
+		std::stringstream lower;
+		lower << std::hex << std::setw(8) << std::setfill('0') << i << ": ";
+		lower << disassemble_lower(*(u32*) &current.program[i], i);
+		ImGui::Text("%s", lower.str().c_str());
 	}
 }
 

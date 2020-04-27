@@ -302,6 +302,7 @@ void init_gui(GLFWwindow **window)
 		exit(1);
 	}
 
+	glfwMaximizeWindow(*window);
 	glfwMakeContextCurrent(*window);
 	glfwSwapInterval(1); // vsync
 

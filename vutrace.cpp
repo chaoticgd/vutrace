@@ -25,6 +25,7 @@
 #include <glad/glad.h>
 #include <GLFW/glfw3.h>
 #include <imgui.h>
+#include <imgui_internal.h>
 #include <examples/imgui_impl_glfw.h>
 #include <examples/imgui_impl_opengl3.h>
 
@@ -53,6 +54,8 @@ void memory_window(AppState &app);
 void disassembly_window(AppState &app);
 std::vector<Snapshot> parse_trace(AppState &app, std::string dir_path);
 void init_gui(GLFWwindow **window);
+void begin_docking();
+void create_dock_layout(GLFWwindow *window);
 
 int main(int argc, char **argv)
 {
@@ -67,7 +70,7 @@ int main(int argc, char **argv)
 	
 	AppState app;
 	app.snapshots = parse_trace(app, argv[1]);
-	
+
 	while(!glfwWindowShouldClose(window)) {
 		glfwPollEvents();
 
@@ -75,7 +78,14 @@ int main(int argc, char **argv)
 		ImGui_ImplGlfw_NewFrame();
 		ImGui::NewFrame();
 
+		begin_docking();
 		update_gui(app);
+		static bool is_first_frame = true;
+		if(is_first_frame) {
+			create_dock_layout(window);
+			is_first_frame = false;
+		}
+		ImGui::End(); // docking
 
 		ImGui::Render();
 		glfwMakeContextCurrent(window);
@@ -320,4 +330,51 @@ void init_gui(GLFWwindow **window)
 	ImGui::StyleColorsDark();
 	ImGui_ImplGlfw_InitForOpenGL(*window, true);
 	ImGui_ImplOpenGL3_Init("#version 120");
+}
+
+void begin_docking() {
+	ImGuiWindowFlags window_flags = ImGuiWindowFlags_MenuBar | ImGuiWindowFlags_NoDocking;
+	ImGuiViewport* viewport = ImGui::GetMainViewport();
+	ImGui::SetNextWindowPos(viewport->Pos);
+	ImGui::SetNextWindowSize(viewport->Size);
+	ImGui::SetNextWindowViewport(viewport->ID);
+	ImGui::PushStyleVar(ImGuiStyleVar_WindowRounding, 0.0f);
+	ImGui::PushStyleVar(ImGuiStyleVar_WindowBorderSize, 0.0f);
+	window_flags |= ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoMove;
+	window_flags |= ImGuiWindowFlags_NoBringToFrontOnFocus | ImGuiWindowFlags_NoNavFocus;
+
+	static bool p_open;
+	ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(0.0f, 0.0f));
+	ImGui::Begin("dock_space", &p_open, window_flags);
+	ImGui::PopStyleVar();
+	
+	ImGui::PopStyleVar(2);
+
+	ImGuiID dockspace_id = ImGui::GetID("dock_space");
+	ImGui::DockSpace(dockspace_id, ImVec2(0.0f, 0.0f), ImGuiDockNodeFlags_None);
+}
+
+void create_dock_layout(GLFWwindow *window) {
+	ImGuiID dockspace_id = ImGui::GetID("dock_space");
+	
+	int width, height;
+	glfwGetFramebufferSize(window, &width, &height);
+	
+	ImGui::DockBuilderRemoveNode(dockspace_id);
+	ImGui::DockBuilderAddNode(dockspace_id, ImGuiDockNodeFlags_DockSpace);
+	ImGui::DockBuilderSetNodeSize(dockspace_id, ImVec2(width, height));
+	
+	ImGuiID top, memory;
+	ImGui::DockBuilderSplitNode(dockspace_id, ImGuiDir_Up, 0.5f, &top, &memory);
+	
+	ImGuiID registers, middle;
+	ImGui::DockBuilderSplitNode(top, ImGuiDir_Left, 1.f / 3.f, &registers, &middle);
+	
+	ImGuiID snapshots, disassembly;
+	ImGui::DockBuilderSplitNode(middle, ImGuiDir_Left, 0.5f, &snapshots, &disassembly);
+	
+	ImGui::DockBuilderDockWindow("Registers", registers);
+	ImGui::DockBuilderDockWindow("Snapshots", snapshots);
+	ImGui::DockBuilderDockWindow("Disassembly", disassembly);
+	ImGui::DockBuilderDockWindow("Memory", memory);
 }

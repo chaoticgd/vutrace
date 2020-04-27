@@ -281,6 +281,8 @@ std::vector<Snapshot> parse_trace(AppState &app, std::string dir_path)
 		exit(1);
 	}
 	
+	fclose(trace);
+	
 	return snapshots;
 }
 

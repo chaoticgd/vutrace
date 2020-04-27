@@ -272,8 +272,6 @@ std::vector<Snapshot> parse_trace(AppState &app, std::string dir_path)
 		
 	char buffer[prog_pos + VU1_PROGSIZE];
 	while(fread(buffer, sizeof(buffer), 1, trace) == 1) {
-		printf("Loading %ld\n", ftell(trace));
-		
 		if(memcmp(buffer, "REGISTERS=======", 0x10) != 0) {
 			fprintf(stderr, "Error: REGISTERS signature missing!");
 			exit(1);

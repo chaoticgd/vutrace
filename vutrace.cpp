@@ -38,6 +38,7 @@ struct Snapshot
 	u8 memory[VU1_MEMSIZE];
 	u8 program[VU1_PROGSIZE];
 	int disassembly;
+	int framebuffer;
 };
 
 struct AppState
@@ -45,6 +46,7 @@ struct AppState
 	std::size_t current_snapshot = 0;
 	std::vector<Snapshot> snapshots;
 	std::vector<std::vector<std::string>> disassemblies;
+	std::vector<GLuint> framebuffer_textures;
 };
 
 void update_gui(AppState &app);
@@ -52,6 +54,7 @@ void snapshots_window(AppState &app);
 void registers_window(AppState &app);
 void memory_window(AppState &app);
 void disassembly_window(AppState &app);
+void framebuffer_window(AppState &app);
 std::vector<Snapshot> parse_trace(AppState &app, std::string dir_path);
 void init_gui(GLFWwindow **window);
 void begin_docking();
@@ -115,6 +118,7 @@ void update_gui(AppState &app)
 	if(ImGui::Begin("Registers"))   registers_window(app);   ImGui::End();
 	if(ImGui::Begin("Memory"))      memory_window(app);      ImGui::End();
 	if(ImGui::Begin("Disassembly")) disassembly_window(app); ImGui::End();
+	if(ImGui::Begin("Framebuffer")) framebuffer_window(app); ImGui::End();
 }
 
 void snapshots_window(AppState &app)
@@ -250,6 +254,14 @@ void disassembly_window(AppState &app)
 	}
 }
 
+void framebuffer_window(AppState &app)
+{
+	Snapshot &current = app.snapshots[app.current_snapshot];
+	GLuint framebuffer_texture = app.framebuffer_textures[current.framebuffer];
+	
+	ImGui::Image((void*)(intptr_t) framebuffer_texture, ImVec2(512, 512));
+}
+
 std::vector<Snapshot> parse_trace(AppState &app, std::string dir_path)
 {
 	std::vector<Snapshot> snapshots;
@@ -272,8 +284,37 @@ std::vector<Snapshot> parse_trace(AppState &app, std::string dir_path)
 		
 	char buffer[prog_pos + VU1_PROGSIZE];
 	while(fread(buffer, sizeof(buffer), 1, trace) == 1) {
+		bool should_continue = false;
+		while(memcmp(buffer, "FRAMEBUFFER=====", 0x10) == 0) {
+			uint32_t* u32buffer = (uint32_t*) &buffer;
+			int size = u32buffer[4];
+			int width = u32buffer[5];
+			int height = u32buffer[6];
+			
+			fseek(trace, -sizeof(buffer) + 0x10 + 0x4*3, SEEK_CUR);
+			
+			uint32_t* pixels = (uint32_t*) malloc(size - 0x8);
+			fread(pixels, size - 0x8, 1, trace);
+			
+			GLuint texture_id;
+			glGenTextures(1, &texture_id);
+			glBindTexture(GL_TEXTURE_2D, texture_id);
+			glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, width, height, 0, GL_BGR, GL_UNSIGNED_BYTE, pixels);
+			glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+			glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+			app.framebuffer_textures.push_back(texture_id);
+			free(pixels);
+			
+			should_continue = true;
+			break;
+		}
+		
+		if(should_continue) {
+			continue;
+		}
+		
 		if(memcmp(buffer, "REGISTERS=======", 0x10) != 0) {
-			fprintf(stderr, "Error: REGISTERS signature missing!");
+			fprintf(stderr, "Error: REGISTERS signature missing at %lx!", ftell(trace));
 			exit(1);
 		}
 		
@@ -282,6 +323,8 @@ std::vector<Snapshot> parse_trace(AppState &app, std::string dir_path)
 		//memset(&current.registers + hack_size, 0, 0x10);
 		memcpy(current.memory, buffer + mem_pos, VU1_MEMSIZE);
 		memcpy(current.program, buffer + prog_pos, VU1_PROGSIZE);
+		current.disassembly = app.disassemblies.size() - 1;
+		current.framebuffer = app.framebuffer_textures.size() - 1;
 		snapshots.push_back(current);
 	}
 	if(!feof(trace)) {
@@ -368,11 +411,15 @@ void create_dock_layout(GLFWwindow *window) {
 	ImGuiID registers, middle;
 	ImGui::DockBuilderSplitNode(top, ImGuiDir_Left, 1.f / 3.f, &registers, &middle);
 	
-	ImGuiID snapshots, disassembly;
-	ImGui::DockBuilderSplitNode(middle, ImGuiDir_Left, 0.5f, &snapshots, &disassembly);
+	ImGuiID snapshots, right;
+	ImGui::DockBuilderSplitNode(middle, ImGuiDir_Left, 0.2f, &snapshots, &right);
+	
+	ImGuiID disassembly, framebuffer;
+	ImGui::DockBuilderSplitNode(right, ImGuiDir_Left, 0.4f, &disassembly, &framebuffer);
 	
 	ImGui::DockBuilderDockWindow("Registers", registers);
 	ImGui::DockBuilderDockWindow("Snapshots", snapshots);
 	ImGui::DockBuilderDockWindow("Disassembly", disassembly);
+	ImGui::DockBuilderDockWindow("Framebuffer", framebuffer);
 	ImGui::DockBuilderDockWindow("Memory", memory);
 }

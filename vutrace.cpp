@@ -32,6 +32,12 @@
 #include "pcsx2defs.h"
 #include "pcsx2disassemble.h"
 
+static const u32 I_BIT = 1 << 31;
+static const u32 E_BIT = 1 << 30;
+static const u32 M_BIT = 1 << 29;
+static const u32 D_BIT = 1 << 28;
+static const u32 T_BIT = 1 << 27;
+
 struct Snapshot
 {
 	VURegs registers;
@@ -264,10 +270,20 @@ void disassembly_window(AppState &app)
 		std::stringstream ss;
 		ss << std::hex << std::setw(4) << std::setfill('0') << i + 4 << ": (";
 		ss << std::hex << std::setw(8) << std::setfill('0') << upper << ") ";
-		ss << disassemble_upper(upper, i + 4) << "\n";
+		ss << disassemble_upper(upper, i + 4);
+		if(upper & I_BIT) ss << " [I]";
+		if(upper & E_BIT) ss << " [E]";
+		if(upper & M_BIT) ss << " [M]";
+		if(upper & D_BIT) ss << " [D]";
+		if(upper & T_BIT) ss << " [T]";
+		ss << "\n";
 		ss << std::hex << std::setw(4) << std::setfill('0') << i << ": (";
 		ss << std::hex << std::setw(8) << std::setfill('0') << lower << ") ";
-		ss << disassemble_lower(lower, i);
+		if(upper & I_BIT) {
+			ss << *(float*) &lower;
+		} else {
+			ss << disassemble_lower(lower, i);
+		}
 		bool clicked = ImGui::Selectable(ss.str().c_str(), is_pc, flags);
 		
 		if(is_pc && app.disassembly_scroll_to) {

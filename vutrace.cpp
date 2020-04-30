@@ -16,6 +16,7 @@
 	along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
+#include <map>
 #include <string>
 #include <vector>
 #include <iomanip>
@@ -47,6 +48,13 @@ struct Snapshot
 	int framebuffer;
 };
 
+struct Instruction
+{
+	bool is_executed = false;
+	std::map<u32, std::size_t> branch_to_times;
+	std::map<u32, std::size_t> branch_from_times;
+};
+
 struct AppState
 {
 	std::size_t current_snapshot = 0;
@@ -55,7 +63,7 @@ struct AppState
 	std::vector<GLuint> framebuffer_textures;
 	bool snapshots_scroll_to = false;
 	bool disassembly_scroll_to = false;
-	std::vector<bool> is_executed;
+	std::vector<Instruction> instructions;
 };
 
 void update_gui(AppState &app);
@@ -258,9 +266,11 @@ void memory_window(AppState &app)
 void disassembly_window(AppState &app)
 {
 	Snapshot &current = app.snapshots[app.current_snapshot];
+	
 	for(std::size_t i = 0; i < VU1_PROGSIZE; i += 8) {
+		Instruction instruction = app.instructions[i / 8];
 		bool is_pc = current.registers.VI[TPC].UL == i;
-		ImGuiSelectableFlags flags = app.is_executed[i / 8] ?
+		ImGuiSelectableFlags flags = instruction.is_executed ?
 			ImGuiSelectableFlags_None :
 			ImGuiSelectableFlags_Disabled;
 		
@@ -284,7 +294,24 @@ void disassembly_window(AppState &app)
 		} else {
 			ss << disassemble_lower(lower, i);
 		}
+		
+		if(instruction.branch_from_times.size() > 0) {
+			std::stringstream addresses;
+			for(auto &[addr, times] : instruction.branch_from_times) {
+				addresses << std::hex << addr << " (" << std::dec << times << ") ";
+			} 
+			ImGui::Text("  %s->", addresses.str().c_str());
+		}
+		
 		bool clicked = ImGui::Selectable(ss.str().c_str(), is_pc, flags);
+		
+		if(instruction.branch_to_times.size() > 0) {
+			std::stringstream addresses;
+			for(auto &[addr, times] : instruction.branch_to_times) {
+				addresses << std::hex << addr << " (" << std::dec << times << ") ";
+			} 
+			ImGui::Text("  -> %s", addresses.str().c_str());
+		}
 		
 		if(is_pc && app.disassembly_scroll_to) {
 			ImGui::SetScrollHere(0.5);
@@ -353,7 +380,7 @@ std::vector<Snapshot> parse_trace(AppState &app, std::string dir_path)
 	static const int mem_pos = reg_pos + hack_size + 0x10;
 	static const int prog_pos = mem_pos + VU1_MEMSIZE + 0x10;
 	
-	app.is_executed.resize(VU1_PROGSIZE / 8);
+	app.instructions.resize(VU1_PROGSIZE / 8);
 	
 	char buffer[prog_pos + VU1_PROGSIZE];
 	while(fread(buffer, sizeof(buffer), 1, trace) == 1) {
@@ -401,7 +428,16 @@ std::vector<Snapshot> parse_trace(AppState &app, std::string dir_path)
 		snapshots.push_back(current);
 		
 		u32 pc = current.registers.VI[TPC].UL;
-		app.is_executed[pc / 8] = true;
+		app.instructions[pc / 8].is_executed = true;
+		
+		Snapshot& last = *(snapshots.end() - 2);
+		u32 last_pc = last.registers.VI[TPC].UL;
+		u32 cur_pc = current.registers.VI[TPC].UL;
+		if(last_pc + 8 != cur_pc) {
+			// A branch has taken place.
+			app.instructions[last_pc / 8].branch_to_times[cur_pc]++;
+			app.instructions[cur_pc / 8].branch_from_times[last_pc]++;
+		}
 	}
 	if(!feof(trace)) {
 		fprintf(stderr, "Error: Failed to read trace!\n");

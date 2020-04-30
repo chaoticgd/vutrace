@@ -47,6 +47,9 @@ struct AppState
 	std::vector<Snapshot> snapshots;
 	std::vector<std::vector<std::string>> disassemblies;
 	std::vector<GLuint> framebuffer_textures;
+	bool snapshots_scroll_to = false;
+	bool disassembly_scroll_to = false;
+	std::vector<bool> is_executed;
 };
 
 void update_gui(AppState &app);
@@ -130,9 +133,17 @@ void snapshots_window(AppState &app)
 	if(ImGui::ListBoxHeader("##snapshots", size)) {
 		for(std::size_t i = 0; i < app.snapshots.size(); i++) {
 			Snapshot& snap = app.snapshots[i];
+			bool is_selected = i == app.current_snapshot;
+			
 			std::string str = std::to_string(i);
-			if(ImGui::Selectable(str.c_str(), i == app.current_snapshot)) {
+			if(ImGui::Selectable(str.c_str(), is_selected)) {
 				app.current_snapshot = i;
+				app.disassembly_scroll_to = true;
+			}
+			
+			if(app.snapshots_scroll_to && is_selected) {
+				ImGui::SetScrollHere(0.5);
+				app.snapshots_scroll_to = false;
 			}
 		}
 		ImGui::ListBoxFooter();
@@ -242,15 +253,59 @@ void disassembly_window(AppState &app)
 {
 	Snapshot &current = app.snapshots[app.current_snapshot];
 	for(std::size_t i = 0; i < VU1_PROGSIZE; i += 8) {
-		std::stringstream upper;
-		upper << std::hex << std::setw(8) << std::setfill('0') << i + 4 << ": ";
-		upper << disassemble_upper(*(u32*) &current.program[i + 4], i + 4);
-		ImGui::Text("%s", upper.str().c_str());
+		bool is_pc = current.registers.VI[TPC].UL == i;
+		ImGuiSelectableFlags flags = app.is_executed[i / 8] ?
+			ImGuiSelectableFlags_None :
+			ImGuiSelectableFlags_Disabled;
 		
-		std::stringstream lower;
-		lower << std::hex << std::setw(8) << std::setfill('0') << i << ": ";
-		lower << disassemble_lower(*(u32*) &current.program[i], i);
-		ImGui::Text("%s", lower.str().c_str());
+		u32 upper = *(u32*) &current.program[i + 4];
+		u32 lower = *(u32*) &current.program[i];
+		
+		std::stringstream ss;
+		ss << std::hex << std::setw(4) << std::setfill('0') << i + 4 << ": (";
+		ss << std::hex << std::setw(8) << std::setfill('0') << upper << ") ";
+		ss << disassemble_upper(upper, i + 4) << "\n";
+		ss << std::hex << std::setw(4) << std::setfill('0') << i << ": (";
+		ss << std::hex << std::setw(8) << std::setfill('0') << lower << ") ";
+		ss << disassemble_lower(lower, i);
+		bool clicked = ImGui::Selectable(ss.str().c_str(), is_pc, flags);
+		
+		if(is_pc && app.disassembly_scroll_to) {
+			ImGui::SetScrollHere(0.5);
+			app.disassembly_scroll_to = false;
+		}
+		
+		if(!is_pc && clicked) {
+			int walk;
+			if(current.registers.VI[TPC].UL > i) {
+				walk = -1;
+			} else {
+				walk = 1;
+			}
+			int j = app.current_snapshot;
+			while(app.snapshots[j].registers.VI[TPC].UL != i) {
+				j += walk;
+				if(j < 0 || j >= app.snapshots.size()) {
+					j = -1;
+					break;
+				}
+			}
+			if(j == -1) {
+				j = app.current_snapshot;
+				while(app.snapshots[j].registers.VI[TPC].UL != i) {
+					j -= walk;
+					if(j < 0 || j >= app.snapshots.size()) {
+						j = -1;
+						break;
+					}
+				}
+			}
+			if(j != -1) {
+				app.current_snapshot = j;
+				app.snapshots_scroll_to = true;
+				app.disassembly_scroll_to = true;
+			}
+		}
 	}
 }
 
@@ -281,7 +336,9 @@ std::vector<Snapshot> parse_trace(AppState &app, std::string dir_path)
 	static const int reg_pos = 0x10;
 	static const int mem_pos = reg_pos + hack_size + 0x10;
 	static const int prog_pos = mem_pos + VU1_MEMSIZE + 0x10;
-		
+	
+	app.is_executed.resize(VU1_PROGSIZE / 8);
+	
 	char buffer[prog_pos + VU1_PROGSIZE];
 	while(fread(buffer, sizeof(buffer), 1, trace) == 1) {
 		bool should_continue = false;
@@ -326,6 +383,9 @@ std::vector<Snapshot> parse_trace(AppState &app, std::string dir_path)
 		current.disassembly = app.disassemblies.size() - 1;
 		current.framebuffer = app.framebuffer_textures.size() - 1;
 		snapshots.push_back(current);
+		
+		u32 pc = current.registers.VI[TPC].UL;
+		app.is_executed[pc / 8] = true;
 	}
 	if(!feof(trace)) {
 		fprintf(stderr, "Error: Failed to read trace!\n");

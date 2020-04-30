@@ -21,6 +21,7 @@
 
 static const uint VU1_MEMSIZE	= 0x4000;		// 16kb
 static const uint VU1_PROGSIZE	= 0x4000;		// 16kb
+static const uint TPC = 26;
 
 typedef int64_t s64;
 typedef uint64_t u64;

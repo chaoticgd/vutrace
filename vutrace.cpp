@@ -53,6 +53,7 @@ struct Instruction
 	bool is_executed = false;
 	std::map<u32, std::size_t> branch_to_times;
 	std::map<u32, std::size_t> branch_from_times;
+	std::size_t times_executed = 0;
 };
 
 struct AppState
@@ -297,20 +298,24 @@ void disassembly_window(AppState &app)
 		
 		if(instruction.branch_from_times.size() > 0) {
 			std::stringstream addresses;
+			std::size_t fallthrough_times = app.instructions[i / 8 + 1].times_executed;
 			for(auto &[addr, times] : instruction.branch_from_times) {
 				addresses << std::hex << addr << " (" << std::dec << times << ") ";
+				fallthrough_times -= times;
 			} 
-			ImGui::Text("  %s->", addresses.str().c_str());
+			ImGui::Text("  %s/ ft (%ld) ->", addresses.str().c_str(), fallthrough_times);
 		}
 		
 		bool clicked = ImGui::Selectable(ss.str().c_str(), is_pc, flags);
 		
 		if(instruction.branch_to_times.size() > 0) {
 			std::stringstream addresses;
+			std::size_t fallthrough_times = instruction.times_executed;
 			for(auto &[addr, times] : instruction.branch_to_times) {
 				addresses << std::hex << addr << " (" << std::dec << times << ") ";
+				fallthrough_times -= times;
 			} 
-			ImGui::Text("  -> %s", addresses.str().c_str());
+			ImGui::Text("  -> %s/ ft (%ld)", addresses.str().c_str(), fallthrough_times);
 		}
 		
 		if(is_pc && app.disassembly_scroll_to) {
@@ -428,16 +433,17 @@ std::vector<Snapshot> parse_trace(AppState &app, std::string dir_path)
 		snapshots.push_back(current);
 		
 		u32 pc = current.registers.VI[TPC].UL;
-		app.instructions[pc / 8].is_executed = true;
+		Instruction &instruction = app.instructions[pc / 8];
+		instruction.is_executed = true;
 		
 		Snapshot& last = *(snapshots.end() - 2);
 		u32 last_pc = last.registers.VI[TPC].UL;
-		u32 cur_pc = current.registers.VI[TPC].UL;
-		if(last_pc + 8 != cur_pc) {
+		if(last_pc + 8 != pc) {
 			// A branch has taken place.
-			app.instructions[last_pc / 8].branch_to_times[cur_pc]++;
-			app.instructions[cur_pc / 8].branch_from_times[last_pc]++;
+			app.instructions[last_pc / 8].branch_to_times[pc]++;
+			instruction.branch_from_times[last_pc]++;
 		}
+		instruction.times_executed++;
 	}
 	if(!feof(trace)) {
 		fprintf(stderr, "Error: Failed to read trace!\n");

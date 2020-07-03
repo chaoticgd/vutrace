@@ -257,6 +257,13 @@ void memory_window(AppState &app)
 		ImDrawList *dl = ImGui::GetWindowDrawList();
 		
 		for(int i = 0; i < VU1_MEMSIZE / ROW_SIZE; i++) {
+			float pos_y = ImGui::GetItemRectMin().y + i * 18.f;
+			
+			static ImColor row_header_col = ImColor(1.f, 1.f, 1.f);
+			std::stringstream row_header;
+			row_header << std::hex << std::setfill('0') << std::setw(5) << i * ROW_SIZE;
+			dl->AddText(ImVec2(8, pos_y), row_header_col, row_header.str().c_str());
+			
 			u8 *data = current.memory + i * ROW_SIZE;
 			u8 *last_data = last->memory + i * ROW_SIZE;
 			for(int j = 0; j < ROW_SIZE; j++) {
@@ -266,8 +273,7 @@ void memory_window(AppState &app)
 				hex << std::hex << val;
 				
 				ImVec2 hex_pos {
-					ImGui::GetItemRectMin().x + (j * 5) / 4 * 18.f,
-					ImGui::GetItemRectMin().y + i * 18.f
+					56 + ImGui::GetItemRectMin().x + (j * 5) / 4 * 18.f, pos_y
 				};
 				ImColor hex_col = ImColor(0.8f, 0.8f, 0.8f);
 				if(val != last_data[j]) {

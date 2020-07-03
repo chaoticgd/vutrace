@@ -212,7 +212,7 @@ void registers_window(AppState &app)
 	};
 	
 	auto draw_int_reg = [](const char *name, REG_VI value) {
-		ImGui::Text("%s = %d", name, value.UL);
+		ImGui::Text("%s = 0x%x = %d", name, value.UL, value.UL);
 	};
 	
 	ImGui::Columns(2);

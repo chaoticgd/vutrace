@@ -253,7 +253,8 @@ void memory_window(AppState &app)
 	
 	static const int ROW_SIZE = 32;
 	
-	if(ImGui::BeginChild("##rows", ImVec2(0, (VU1_MEMSIZE / ROW_SIZE) * 18))) {
+	ImGui::BeginChild("rows_outer");
+	if(ImGui::BeginChild("rows", ImVec2(0, (VU1_MEMSIZE / ROW_SIZE) * 18))) {
 		ImDrawList *dl = ImGui::GetWindowDrawList();
 		
 		for(int i = 0; i < VU1_MEMSIZE / ROW_SIZE; i++) {
@@ -284,6 +285,7 @@ void memory_window(AppState &app)
 		}
 		ImGui::EndChild();
 	}
+	ImGui::EndChild();
 }
 
 void disassembly_window(AppState &app)

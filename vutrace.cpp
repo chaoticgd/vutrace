@@ -245,20 +245,6 @@ void memory_window(AppState &app)
 				}
 				dl->AddText(hex_pos, hex_col, hex.str().c_str());
 			}
-			
-			for(int j = 0; j < ROW_SIZE; j += 4) {	
-				std::stringstream fp;
-				fp << *(float*) &data[j];
-				ImVec2 fp_pos {
-					ImGui::GetItemRectMin().x + ((ROW_SIZE + j + 1) * 5) / 4 * 18.f,
-					ImGui::GetItemRectMin().y + i * 18.f
-				};
-				ImColor fp_col = ImColor(0.8f, 0.8f, 0.8f);
-				if(*(float*) &data[j] != *(float*) &last_data[j]) {
-					fp_col = ImColor(1.f, 0.5f, 0.5f);
-				}
-				dl->AddText(fp_pos, fp_col, fp.str().c_str());
-			}
 		}
 		ImGui::EndChild();
 	}

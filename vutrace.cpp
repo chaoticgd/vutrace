@@ -408,6 +408,9 @@ void disassembly_window(AppState &app)
 void framebuffer_window(AppState &app)
 {
 	Snapshot &current = app.snapshots[app.current_snapshot];
+	if(current.framebuffer == -1) {
+		return;
+	}
 	GLuint framebuffer_texture = app.framebuffer_textures[current.framebuffer];
 	
 	ImGui::Image((void*)(intptr_t) framebuffer_texture, ImVec2(512, 512));

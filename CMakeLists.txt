@@ -12,6 +12,7 @@ add_executable(vutrace
 	imgui/imgui.cpp
 	imgui/examples/imgui_impl_glfw.cpp
 	imgui/examples/imgui_impl_opengl3.cpp
+	imgui/misc/cpp/imgui_stdlib.cpp
 )
 
 add_subdirectory(glad)

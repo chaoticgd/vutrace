@@ -27,6 +27,7 @@
 #include <GLFW/glfw3.h>
 #include <imgui.h>
 #include <imgui_internal.h>
+#include <misc/cpp/imgui_stdlib.h>
 #include <examples/imgui_impl_glfw.h>
 #include <examples/imgui_impl_opengl3.h>
 
@@ -67,6 +68,12 @@ struct AppState
 	std::vector<Instruction> instructions;
 };
 
+struct MessageBoxState
+{
+	bool is_open = false;
+	std::string text;
+};
+
 void update_gui(AppState &app);
 void snapshots_window(AppState &app);
 void registers_window(AppState &app);
@@ -77,6 +84,10 @@ std::vector<Snapshot> parse_trace(AppState &app, std::string dir_path);
 void init_gui(GLFWwindow **window);
 void begin_docking();
 void create_dock_layout(GLFWwindow *window);
+void alert(MessageBoxState &state, const char *title);
+bool prompt(MessageBoxState &state, const char *title);
+std::vector<u8> decode_hex(const std::string &in);
+std::string to_hex(size_t n);
 
 int main(int argc, char **argv)
 {
@@ -219,6 +230,25 @@ void memory_window(AppState &app)
 		last = &app.snapshots[app.current_snapshot - 1];
 	} else {
 		last = &current;
+	}
+	
+	static MessageBoxState found_bytes;
+	alert(found_bytes, "Found Bytes");
+	
+	static MessageBoxState find_bytes;
+	if(prompt(find_bytes, "Find Bytes") && !found_bytes.is_open) {
+		std::vector<u8> value_raw = decode_hex(find_bytes.text);
+		for(std::size_t i = 0; i < VU1_MEMSIZE - value_raw.size(); i++) {
+			if(memcmp(value_raw.data(), &current.memory[i], value_raw.size()) == 0) {
+				found_bytes.is_open = true;
+				found_bytes.text = "Found match at 0x" + to_hex(i);
+				break;
+			}
+		}
+		if(!found_bytes.is_open) {
+			found_bytes.is_open = true;
+			found_bytes.text = "No match found";
+		}
 	}
 	
 	static const int ROW_SIZE = 32;
@@ -499,7 +529,8 @@ void begin_docking() {
 	ImGui::DockSpace(dockspace_id, ImVec2(0.0f, 0.0f), ImGuiDockNodeFlags_None);
 }
 
-void create_dock_layout(GLFWwindow *window) {
+void create_dock_layout(GLFWwindow *window)
+{
 	ImGuiID dockspace_id = ImGui::GetID("dock_space");
 	
 	int width, height;
@@ -526,4 +557,79 @@ void create_dock_layout(GLFWwindow *window) {
 	ImGui::DockBuilderDockWindow("Disassembly", disassembly);
 	ImGui::DockBuilderDockWindow("Framebuffer", framebuffer);
 	ImGui::DockBuilderDockWindow("Memory", memory);
+}
+
+void alert(MessageBoxState &state, const char *title)
+{
+	if(state.is_open) {
+		ImGui::SetNextWindowSize(ImVec2(400, 100));
+		ImGui::Begin(title);
+		ImGui::Text("%s", state.text.c_str());
+		if(ImGui::Button("Close")) {
+			state.text = "";
+			state.is_open = false;
+		}
+		ImGui::End();
+	}
+}
+
+bool prompt(MessageBoxState &state, const char *title)
+{
+	bool result = false;
+	if(ImGui::Button(title)) {
+		state.is_open = true;
+		state.text = "";
+	}
+	if(state.is_open) {
+		ImGui::SetNextWindowSize(ImVec2(400, 100));
+		ImGui::Begin(title);
+		ImGui::InputText("##input", &state.text);
+		if(ImGui::Button("Okay")) {
+			state.is_open = false;
+			result = true;
+		}
+		ImGui::SameLine();
+		if(ImGui::Button("Cancel")) {
+			state.is_open = false;
+		}
+		ImGui::End();
+	}
+	return result;
+}
+
+std::vector<u8> decode_hex(const std::string &in)
+{
+	std::vector<u8> result;
+	u8 current_byte;
+	bool reading_second_nibble = false;
+	for(char c : in) {
+		u8 nibble = 0;
+		if(c >= '0' && c <= '9') {
+			nibble = c - '0';
+		} else if(c >= 'A' && c <= 'Z') {
+			nibble = c - 'A' + 0xa;
+		} else if(c >= 'a' && c <= 'z') {
+			nibble = c - 'a' + 0xa;
+		} else {
+			continue;
+		}
+		
+		if(!reading_second_nibble) {
+			current_byte = nibble << 4;
+			reading_second_nibble = true;
+		} else {
+			current_byte |= nibble;
+			result.push_back(current_byte);
+			reading_second_nibble = false;
+		}
+		
+	}
+	return result;
+}
+
+std::string to_hex(size_t n)
+{
+	std::stringstream ss;
+	ss << std::hex << n;
+	return ss.str();
 }

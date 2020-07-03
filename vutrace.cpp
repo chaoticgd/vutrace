@@ -23,6 +23,7 @@
 #include <sstream>
 #include <stdio.h>
 #include <stdlib.h>
+#include <functional>
 #include <glad/glad.h>
 #include <GLFW/glfw3.h>
 #include <imgui.h>
@@ -61,7 +62,6 @@ struct AppState
 {
 	std::size_t current_snapshot = 0;
 	std::vector<Snapshot> snapshots;
-	std::vector<std::vector<std::string>> disassemblies;
 	std::vector<GLuint> framebuffer_textures;
 	bool snapshots_scroll_to = false;
 	bool disassembly_scroll_to = false;
@@ -88,6 +88,7 @@ void alert(MessageBoxState &state, const char *title);
 bool prompt(MessageBoxState &state, const char *title);
 std::vector<u8> decode_hex(const std::string &in);
 std::string to_hex(size_t n);
+int bit_range(uint64_t val, int lo, int hi);
 
 int main(int argc, char **argv)
 {
@@ -152,6 +153,25 @@ void update_gui(AppState &app)
 
 void snapshots_window(AppState &app)
 {
+	std::function<bool(Snapshot &)> filter;
+	
+	if(ImGui::BeginTabBar("tabs")) {
+		if(ImGui::BeginTabItem("All")) {
+			filter = [&](Snapshot &snapshot) { return true; };
+			ImGui::EndTabItem();
+		}
+		if(ImGui::BeginTabItem("XGKICK")) {
+			filter = [&](Snapshot &snapshot) {
+				u32 pc = snapshot.registers.VI[TPC].UL;
+				u32 lower = *(u32*) &snapshot.program[pc];
+				std::string disassembly = disassemble_lower(lower, pc);
+				return disassembly[0] == 'X' && disassembly[1] == 'G';
+			};
+			ImGui::EndTabItem();
+		}
+		ImGui::EndTabBar();
+	}
+	
 	ImVec2 size = ImGui::GetWindowSize();
 	size.x -= 16;
 	size.y -= 64;
@@ -160,6 +180,10 @@ void snapshots_window(AppState &app)
 		for(std::size_t i = 0; i < app.snapshots.size(); i++) {
 			Snapshot& snap = app.snapshots[i];
 			bool is_selected = i == app.current_snapshot;
+			
+			if(!filter(snap)) {
+				continue;
+			}
 			
 			std::string str = std::to_string(i);
 			if(ImGui::Selectable(str.c_str(), is_selected)) {
@@ -452,7 +476,6 @@ std::vector<Snapshot> parse_trace(AppState &app, std::string dir_path)
 		//memset(&current.registers + hack_size, 0, 0x10);
 		memcpy(current.memory, buffer + mem_pos, VU1_MEMSIZE);
 		memcpy(current.program, buffer + prog_pos, VU1_PROGSIZE);
-		current.disassembly = app.disassemblies.size() - 1;
 		current.framebuffer = app.framebuffer_textures.size() - 1;
 		snapshots.push_back(current);
 		
@@ -640,4 +663,9 @@ std::string to_hex(size_t n)
 	std::stringstream ss;
 	ss << std::hex << n;
 	return ss.str();
+}
+
+int bit_range(uint64_t val, int lo, int hi)
+{
+	return (val >> lo) & ((1 << (hi - lo + 1)) - 1);
 }

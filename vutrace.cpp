@@ -338,7 +338,7 @@ void disassembly_window(AppState &app)
 		if(upper & M_BIT) ss << " [M]";
 		if(upper & D_BIT) ss << " [D]";
 		if(upper & T_BIT) ss << " [T]";
-		ss << "\n";
+		while(ss.str().size() < 64) ss << " ";
 		ss << std::hex << std::setw(4) << std::setfill('0') << i << ": (";
 		ss << std::hex << std::setw(8) << std::setfill('0') << lower << ") ";
 		if(upper & I_BIT) {

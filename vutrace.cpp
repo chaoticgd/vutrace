@@ -150,7 +150,7 @@ void update_gui(AppState &app)
 	if(ImGui::Begin("Registers"))   registers_window(app);   ImGui::End();
 	if(ImGui::Begin("Memory"))      memory_window(app);      ImGui::End();
 	if(ImGui::Begin("Disassembly")) disassembly_window(app); ImGui::End();
-	if(ImGui::Begin("Framebuffer")) framebuffer_window(app); ImGui::End();
+	//if(ImGui::Begin("Framebuffer")) framebuffer_window(app); ImGui::End();
 	if(ImGui::Begin("GS Packet"))   gs_packet_window(app);   ImGui::End();
 }
 

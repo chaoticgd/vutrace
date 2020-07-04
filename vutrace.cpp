@@ -493,12 +493,8 @@ std::vector<Snapshot> parse_trace(AppState &app, std::string dir_path)
 		exit(1);
 	}
 	
-	// My VURegs varies in size to their one.
-	// Instead of fixing it, here's this horrible thing.
-	static const int hack_size = sizeof(VURegs) - 0x10;
-	
 	static const int reg_pos = 0x10;
-	static const int mem_pos = reg_pos + hack_size + 0x10;
+	static const int mem_pos = reg_pos + sizeof(VURegs) + 0x10;
 	static const int prog_pos = mem_pos + VU1_MEMSIZE + 0x10;
 	
 	app.instructions.resize(VU1_PROGSIZE / 8);
@@ -511,7 +507,7 @@ std::vector<Snapshot> parse_trace(AppState &app, std::string dir_path)
 		}
 		
 		Snapshot current;
-		memcpy(&current.registers, buffer + reg_pos, hack_size);
+		memcpy(&current.registers, buffer + reg_pos, sizeof(VURegs));
 		//memset(&current.registers + hack_size, 0, 0x10);
 		memcpy(current.memory, buffer + mem_pos, VU1_MEMSIZE);
 		memcpy(current.program, buffer + prog_pos, VU1_PROGSIZE);

@@ -134,8 +134,8 @@ struct VURegs
 	u32 statusflag;
 	u32 clipflag;
 
-	u8 *Mem;
-	u8 *Micro;
+	u32 Mem;
+	u32 Micro;
 
 	u32 ebit;
 

@@ -34,6 +34,7 @@
 
 #include "pcsx2defs.h"
 #include "pcsx2disassemble.h"
+#include "gif.h"
 
 static const u32 I_BIT = 1 << 31;
 static const u32 E_BIT = 1 << 30;
@@ -80,6 +81,7 @@ void registers_window(AppState &app);
 void memory_window(AppState &app);
 void disassembly_window(AppState &app);
 void framebuffer_window(AppState &app);
+void gs_packet_window(AppState &app);
 std::vector<Snapshot> parse_trace(AppState &app, std::string dir_path);
 void init_gui(GLFWwindow **window);
 void begin_docking();
@@ -88,7 +90,7 @@ void alert(MessageBoxState &state, const char *title);
 bool prompt(MessageBoxState &state, const char *title);
 std::vector<u8> decode_hex(const std::string &in);
 std::string to_hex(size_t n);
-int bit_range(uint64_t val, int lo, int hi);
+size_t from_hex(const std::string& in);
 
 int main(int argc, char **argv)
 {
@@ -149,6 +151,7 @@ void update_gui(AppState &app)
 	if(ImGui::Begin("Memory"))      memory_window(app);      ImGui::End();
 	if(ImGui::Begin("Disassembly")) disassembly_window(app); ImGui::End();
 	if(ImGui::Begin("Framebuffer")) framebuffer_window(app); ImGui::End();
+	if(ImGui::Begin("GS Packet"))   gs_packet_window(app);   ImGui::End();
 }
 
 void snapshots_window(AppState &app)
@@ -416,6 +419,83 @@ void framebuffer_window(AppState &app)
 	ImGui::Image((void*)(intptr_t) framebuffer_texture, ImVec2(512, 512));
 }
 
+void gs_packet_window(AppState &app)
+{
+	ImGui::Columns(2);
+	
+	static std::string address_hex;
+	ImGui::InputText("Address", &address_hex);
+	
+	if(address_hex.size() == 0) {
+		return;
+	}
+	
+	std::size_t address = from_hex(address_hex);
+	if(address < 0) address = 0;
+	if(address > VU1_MEMSIZE) address = VU1_MEMSIZE;
+	
+	Snapshot &snap = app.snapshots[app.current_snapshot];
+	GsPacket packet = read_gs_packet(&snap.memory[address], VU1_MEMSIZE - address);
+	
+	ImGui::BeginChild("primlist");
+	
+	static std::size_t selected_primitive = 0;
+	for(std::size_t i = 0; i < packet.primitives.size(); i++) {
+		std::string label = std::to_string(i);
+		if(ImGui::Selectable(label.c_str(), i == selected_primitive)) {
+			selected_primitive = i;
+		}
+	}
+	if(selected_primitive >= packet.primitives.size()) {
+		selected_primitive = 0;
+	}
+	
+	ImGui::EndChild();
+	ImGui::NextColumn();
+	
+	if(packet.primitives.size() < 1) {
+		return;
+	}
+	const GsPrimitive &prim = packet.primitives[selected_primitive];
+	const GifTag &tag = prim.tag;
+	
+	ImGui::TextWrapped("NLOOP=%x, EOP=%x, PRE=%x, FLAG=%s, NREG=%lx\n",
+		tag.nloop, tag.eop, tag.pre, gif_flag_name(tag.flag), tag.regs.size());
+	
+	ImGui::TextWrapped("PRIM: PRIM=%s, IIP=%s, TME=%d, FGE=%d, ABE=%d, AA1=%d, FST=%s, CTXT=%s, FIX=%d",
+		gs_primitive_type_name(tag.prim.prim),
+		tag.prim.iip == GSSHADE_FLAT ? "FLAT" : "GOURAUD",
+		tag.prim.tme, tag.prim.fge, tag.prim.abe, tag.prim.aa1,
+		tag.prim.fst == GSFST_STQ ? "STQ" : "UV",
+		tag.prim.ctxt == GSCTXT_1 ? "FIRST" : "SECOND",
+		tag.prim.fix);
+	
+	
+	ImGui::TextWrapped("REGS:");
+	ImGui::SameLine();
+	for(std::size_t i = 0; i < tag.regs.size(); i++) {
+		ImGui::TextWrapped("%s", gs_register_name(tag.regs[i]));
+		ImGui::SameLine();
+	}
+	ImGui::NewLine();
+	
+	ImGui::BeginChild("data");
+	for(const GsPackedData& data : prim.packed_data) {
+		ImGui::Text("%x: %6s", data.source_address, gs_register_name(data.reg));
+		ImGui::SameLine();
+		for(std::size_t i = 0; i < 0x10; i += 4) {
+			ImGui::Text("%02x%02x%02x%02x",
+				data.buffer[i + 0],
+				data.buffer[i + 1],
+				data.buffer[i + 2],
+				data.buffer[i + 3]);
+			ImGui::SameLine();
+		}
+		ImGui::NewLine();
+	}
+	ImGui::EndChild();
+}
+
 std::vector<Snapshot> parse_trace(AppState &app, std::string dir_path)
 {
 	std::vector<Snapshot> snapshots;
@@ -574,8 +654,8 @@ void create_dock_layout(GLFWwindow *window)
 	ImGui::DockBuilderAddNode(dockspace_id, ImGuiDockNodeFlags_DockSpace);
 	ImGui::DockBuilderSetNodeSize(dockspace_id, ImVec2(width, height));
 	
-	ImGuiID top, memory;
-	ImGui::DockBuilderSplitNode(dockspace_id, ImGuiDir_Up, 0.5f, &top, &memory);
+	ImGuiID top, bottom;
+	ImGui::DockBuilderSplitNode(dockspace_id, ImGuiDir_Up, 0.5f, &top, &bottom);
 	
 	ImGuiID registers, middle;
 	ImGui::DockBuilderSplitNode(top, ImGuiDir_Left, 1.f / 3.f, &registers, &middle);
@@ -586,11 +666,15 @@ void create_dock_layout(GLFWwindow *window)
 	ImGuiID disassembly, framebuffer;
 	ImGui::DockBuilderSplitNode(right, ImGuiDir_Left, 0.4f, &disassembly, &framebuffer);
 	
+	ImGuiID memory, gs_packet;
+	ImGui::DockBuilderSplitNode(bottom, ImGuiDir_Left, 0.5f, &memory, &gs_packet);
+	
 	ImGui::DockBuilderDockWindow("Registers", registers);
 	ImGui::DockBuilderDockWindow("Snapshots", snapshots);
 	ImGui::DockBuilderDockWindow("Disassembly", disassembly);
 	ImGui::DockBuilderDockWindow("Framebuffer", framebuffer);
 	ImGui::DockBuilderDockWindow("Memory", memory);
+	ImGui::DockBuilderDockWindow("GS Packet", gs_packet);
 }
 
 void alert(MessageBoxState &state, const char *title)
@@ -668,7 +752,10 @@ std::string to_hex(size_t n)
 	return ss.str();
 }
 
-int bit_range(uint64_t val, int lo, int hi)
-{
-	return (val >> lo) & ((1 << (hi - lo + 1)) - 1);
+size_t from_hex(const std::string& in) {
+	size_t result;
+	std::stringstream ss;
+	ss << std::hex << in;
+	ss >> result;
+	return result; 
 }

@@ -182,6 +182,10 @@ void snapshots_window(AppState &app)
 	if(ImGui::ListBoxHeader("##snapshots", size)) {
 		for(std::size_t i = 0; i < app.snapshots.size(); i++) {
 			Snapshot& snap = app.snapshots[i];
+			Snapshot next_snap;
+			if(i < app.snapshots.size() - 1) {
+				next_snap = app.snapshots[i + 1];
+			}
 			bool is_selected = i == app.current_snapshot;
 			
 			if(!filter(snap)) {
@@ -190,10 +194,10 @@ void snapshots_window(AppState &app)
 			
 			std::stringstream ss;
 			ss << i;
-			if(snap.read_size > 0) {
-				ss << " READ 0x" << std::hex << snap.read_addr;
-			} else if(snap.write_size > 0) {
-				ss << " WRITE 0x" << std::hex << snap.write_addr;
+			if(next_snap.read_size > 0) {
+				ss << " READ 0x" << std::hex << next_snap.read_addr;
+			} else if(next_snap.write_size > 0) {
+				ss << " WRITE 0x" << std::hex << next_snap.write_addr;
 			}
 			if(ImGui::Selectable(ss.str().c_str(), is_selected)) {
 				app.current_snapshot = i;

@@ -329,6 +329,11 @@ void disassembly_window(AppState &app)
 {
 	Snapshot &current = app.snapshots[app.current_snapshot];
 	
+	static std::string highlight;
+	ImGui::InputText("Highlight", &highlight);
+	
+	ImGui::BeginChild("disasm");
+	
 	for(std::size_t i = 0; i < VU1_PROGSIZE; i += 8) {
 		Instruction instruction = app.instructions[i / 8];
 		bool is_pc = current.registers.VI[TPC].UL == i;
@@ -367,7 +372,15 @@ void disassembly_window(AppState &app)
 			ImGui::Text("  %s/ ft (%ld) ->", addresses.str().c_str(), fallthrough_times);
 		}
 		
+		bool is_highlighted = highlight.size() > 0 && ss.str().find(highlight) != std::string::npos;
+		
+		if(is_highlighted) {
+			ImGui::PushStyleColor(ImGuiCol_Text, ImColor(255, 255, 0).Value);
+		}
 		bool clicked = ImGui::Selectable(ss.str().c_str(), is_pc, flags);
+		if(is_highlighted) {
+			ImGui::PopStyleColor();
+		}
 		
 		if(instruction.branch_to_times.size() > 0) {
 			std::stringstream addresses;
@@ -416,6 +429,8 @@ void disassembly_window(AppState &app)
 			}
 		}
 	}
+	
+	ImGui::EndChild();
 }
 
 void gs_packet_window(AppState &app)

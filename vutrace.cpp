@@ -48,6 +48,10 @@ struct Snapshot
 	u8 memory[VU1_MEMSIZE];
 	u8 program[VU1_PROGSIZE];
 	int disassembly;
+	u32 read_addr = 0;
+	u32 read_size = 0;
+	u32 write_addr = 0;
+	u32 write_size = 0;
 };
 
 struct Instruction
@@ -486,6 +490,8 @@ enum VUTracePacketType {
 	VUTRACE_SETREGISTERS = 'R', // VURegs struct follows (32-bit pointers).
 	VUTRACE_SETMEMORY = 'M', // 16k memory follows.
 	VUTRACE_SETINSTRUCTIONS = 'I', // 16k micromem follows.
+	VUTRACE_LOADOP = 'L', // u32 address, u32 size follows.
+	VUTRACE_STOREOP = 'S' // u32 address, u32 size follows.
 };
 
 std::vector<Snapshot> parse_trace(AppState &app, std::string dir_path)
@@ -544,6 +550,14 @@ std::vector<Snapshot> parse_trace(AppState &app, std::string dir_path)
 				break;
 			case VUTRACE_SETINSTRUCTIONS:
 				check_eof(fread(current.program, VU1_PROGSIZE, 1, trace));
+				break;
+			case VUTRACE_LOADOP:
+				check_eof(fread(&current.read_addr, sizeof(u32), 1, trace));
+				check_eof(fread(&current.read_size, sizeof(u32), 1, trace));
+				break;
+			case VUTRACE_STOREOP:
+				check_eof(fread(&current.write_addr, sizeof(u32), 1, trace));
+				check_eof(fread(&current.write_size, sizeof(u32), 1, trace));
 				break;
 			default:
 				fprintf(stderr, "Error: Invalid packet type 0x%x in trace file at 0x%lx!\n",

@@ -481,6 +481,13 @@ void gs_packet_window(AppState &app)
 	ImGui::EndChild();
 }
 
+enum VUTracePacketType {
+	VUTRACE_PUSHSNAPSHOT = 'P', // Next packet directly follows.
+	VUTRACE_SETREGISTERS = 'R', // VURegs struct follows (32-bit pointers).
+	VUTRACE_SETMEMORY = 'M', // 16k memory follows.
+	VUTRACE_SETINSTRUCTIONS = 'I', // 16k micromem follows.
+};
+
 std::vector<Snapshot> parse_trace(AppState &app, std::string dir_path)
 {
 	std::vector<Snapshot> snapshots;
@@ -499,32 +506,50 @@ std::vector<Snapshot> parse_trace(AppState &app, std::string dir_path)
 	
 	app.instructions.resize(VU1_PROGSIZE / 8);
 	
-	char buffer[prog_pos + VU1_PROGSIZE];
-	while(fread(buffer, sizeof(buffer), 1, trace) == 1) {
-		if(memcmp(buffer, "REGISTERS=======", 0x10) != 0) {
-			fprintf(stderr, "Error: REGISTERS signature missing at %lx!", ftell(trace));
+	auto check_eof = [](int n) {
+		if(n != 1) {
+			fprintf(stderr, "Error: Unexpected end of file.\n");
 			exit(1);
 		}
-		
-		Snapshot current;
-		memcpy(&current.registers, buffer + reg_pos, sizeof(VURegs));
-		//memset(&current.registers + hack_size, 0, 0x10);
-		memcpy(current.memory, buffer + mem_pos, VU1_MEMSIZE);
-		memcpy(current.program, buffer + prog_pos, VU1_PROGSIZE);
-		snapshots.push_back(current);
-		
-		u32 pc = current.registers.VI[TPC].UL;
-		Instruction &instruction = app.instructions[pc / 8];
-		instruction.is_executed = true;
-		
-		Snapshot& last = *(snapshots.end() - 2);
-		u32 last_pc = last.registers.VI[TPC].UL;
-		if(last_pc + 8 != pc) {
-			// A branch has taken place.
-			app.instructions[last_pc / 8].branch_to_times[pc]++;
-			instruction.branch_from_times[last_pc]++;
+	};
+	
+	Snapshot current;
+	VUTracePacketType packet_type;
+	while(fread(&packet_type, 1, 1, trace) == 1) {
+		switch(packet_type) {
+			case VUTRACE_PUSHSNAPSHOT: {
+				snapshots.push_back(current);
+				
+				u32 pc = current.registers.VI[TPC].UL;
+				Instruction &instruction = app.instructions[pc / 8];
+				instruction.is_executed = true;
+				
+				Snapshot &last = *(snapshots.end() - 2);
+				u32 last_pc = last.registers.VI[TPC].UL;
+				if(last_pc + 8 != pc) {
+					// A branch has taken place.
+					app.instructions[last_pc / 8].branch_to_times[pc]++;
+					instruction.branch_from_times[last_pc]++;
+				}
+				instruction.times_executed++;
+				
+				current = {};
+				break;
+			}
+			case VUTRACE_SETREGISTERS:
+				check_eof(fread(&current.registers, sizeof(VURegs), 1, trace));
+				break;
+			case VUTRACE_SETMEMORY:
+				check_eof(fread(current.memory, VU1_MEMSIZE, 1, trace));
+				break;
+			case VUTRACE_SETINSTRUCTIONS:
+				check_eof(fread(current.program, VU1_PROGSIZE, 1, trace));
+				break;
+			default:
+				fprintf(stderr, "Error: Invalid packet type 0x%x in trace file at 0x%lx!\n",
+					packet_type, ftell(trace));
+				exit(1);
 		}
-		instruction.times_executed++;
 	}
 	if(!feof(trace)) {
 		fprintf(stderr, "Error: Failed to read trace!\n");

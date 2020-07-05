@@ -188,8 +188,14 @@ void snapshots_window(AppState &app)
 				continue;
 			}
 			
-			std::string str = std::to_string(i);
-			if(ImGui::Selectable(str.c_str(), is_selected)) {
+			std::stringstream ss;
+			ss << i;
+			if(snap.read_size > 0) {
+				ss << " READ 0x" << std::hex << snap.read_addr;
+			} else if(snap.write_size > 0) {
+				ss << " WRITE 0x" << std::hex << snap.write_addr;
+			}
+			if(ImGui::Selectable(ss.str().c_str(), is_selected)) {
 				app.current_snapshot = i;
 				app.disassembly_scroll_to = true;
 			}

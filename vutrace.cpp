@@ -603,6 +603,14 @@ std::string disassemble(u8 *program, u32 address)
 	u32 lower = *(u32*) &program[address];
 	
 	std::stringstream ss;
+	ss << std::hex << std::setw(4) << std::setfill('0') << address << ": (";
+	ss << std::hex << std::setw(8) << std::setfill('0') << lower << ") ";
+	if(upper & I_BIT) {
+		ss << *(float*) &lower;
+	} else {
+		ss << disassemble_lower(lower, address);
+	}
+	while(ss.str().size() < 64) ss << " ";
 	ss << std::hex << std::setw(4) << std::setfill('0') << address + 4 << ": (";
 	ss << std::hex << std::setw(8) << std::setfill('0') << upper << ") ";
 	ss << disassemble_upper(upper, address + 4);
@@ -611,14 +619,6 @@ std::string disassemble(u8 *program, u32 address)
 	if(upper & M_BIT) ss << " [M]";
 	if(upper & D_BIT) ss << " [D]";
 	if(upper & T_BIT) ss << " [T]";
-	while(ss.str().size() < 64) ss << " ";
-	ss << std::hex << std::setw(4) << std::setfill('0') << address << ": (";
-	ss << std::hex << std::setw(8) << std::setfill('0') << lower << ") ";
-	if(upper & I_BIT) {
-		ss << *(float*) &lower;
-	} else {
-		ss << disassemble_lower(lower, address);
-	}
 	return ss.str();
 }
 

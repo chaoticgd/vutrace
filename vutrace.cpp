@@ -69,6 +69,7 @@ struct AppState
 	bool snapshots_scroll_to = false;
 	bool disassembly_scroll_to = false;
 	std::vector<Instruction> instructions;
+	std::string disassembly_highlight;
 };
 
 struct MessageBoxState
@@ -84,6 +85,7 @@ void memory_window(AppState &app);
 void disassembly_window(AppState &app);
 void gs_packet_window(AppState &app);
 std::vector<Snapshot> parse_trace(AppState &app, std::string dir_path);
+std::string disassemble(u8 *program, u32 address);
 void init_gui(GLFWwindow **window);
 void begin_docking();
 void create_dock_layout(GLFWwindow *window);
@@ -199,9 +201,22 @@ void snapshots_window(AppState &app)
 			} else if(next_snap.write_size > 0) {
 				ss << " WRITE 0x" << std::hex << next_snap.write_addr;
 			}
+			
+			std::string disassembly = disassemble(snap.program, snap.registers.VI[TPC].UL);
+			
+			bool is_highlighted =
+			app.disassembly_highlight.size() > 0 &&
+				disassembly.find(app.disassembly_highlight) != std::string::npos;
+		
+			if(is_highlighted) {
+				ImGui::PushStyleColor(ImGuiCol_Text, ImColor(255, 255, 0).Value);
+			}
 			if(ImGui::Selectable(ss.str().c_str(), is_selected)) {
 				app.current_snapshot = i;
 				app.disassembly_scroll_to = true;
+			}
+			if(is_highlighted) {
+				ImGui::PopStyleColor();
 			}
 			
 			if(app.snapshots_scroll_to && is_selected) {
@@ -329,8 +344,7 @@ void disassembly_window(AppState &app)
 {
 	Snapshot &current = app.snapshots[app.current_snapshot];
 	
-	static std::string highlight;
-	ImGui::InputText("Highlight", &highlight);
+	ImGui::InputText("Highlight", &app.disassembly_highlight);
 	
 	ImGui::BeginChild("disasm");
 	
@@ -341,26 +355,7 @@ void disassembly_window(AppState &app)
 			ImGuiSelectableFlags_None :
 			ImGuiSelectableFlags_Disabled;
 		
-		u32 upper = *(u32*) &current.program[i + 4];
-		u32 lower = *(u32*) &current.program[i];
-		
-		std::stringstream ss;
-		ss << std::hex << std::setw(4) << std::setfill('0') << i + 4 << ": (";
-		ss << std::hex << std::setw(8) << std::setfill('0') << upper << ") ";
-		ss << disassemble_upper(upper, i + 4);
-		if(upper & I_BIT) ss << " [I]";
-		if(upper & E_BIT) ss << " [E]";
-		if(upper & M_BIT) ss << " [M]";
-		if(upper & D_BIT) ss << " [D]";
-		if(upper & T_BIT) ss << " [T]";
-		while(ss.str().size() < 64) ss << " ";
-		ss << std::hex << std::setw(4) << std::setfill('0') << i << ": (";
-		ss << std::hex << std::setw(8) << std::setfill('0') << lower << ") ";
-		if(upper & I_BIT) {
-			ss << *(float*) &lower;
-		} else {
-			ss << disassemble_lower(lower, i);
-		}
+		std::string disassembly = disassemble(current.program, i);
 		
 		if(instruction.branch_from_times.size() > 0) {
 			std::stringstream addresses;
@@ -372,12 +367,14 @@ void disassembly_window(AppState &app)
 			ImGui::Text("  %s/ ft (%ld) ->", addresses.str().c_str(), fallthrough_times);
 		}
 		
-		bool is_highlighted = highlight.size() > 0 && ss.str().find(highlight) != std::string::npos;
+		bool is_highlighted =
+			app.disassembly_highlight.size() > 0 &&
+			disassembly.find(app.disassembly_highlight) != std::string::npos;
 		
 		if(is_highlighted) {
 			ImGui::PushStyleColor(ImGuiCol_Text, ImColor(255, 255, 0).Value);
 		}
-		bool clicked = ImGui::Selectable(ss.str().c_str(), is_pc, flags);
+		bool clicked = ImGui::Selectable(disassembly.c_str(), is_pc, flags);
 		if(is_highlighted) {
 			ImGui::PopStyleColor();
 		}
@@ -598,6 +595,31 @@ std::vector<Snapshot> parse_trace(AppState &app, std::string dir_path)
 	fclose(trace);
 	
 	return snapshots;
+}
+
+std::string disassemble(u8 *program, u32 address)
+{
+	u32 upper = *(u32*) &program[address + 4];
+	u32 lower = *(u32*) &program[address];
+	
+	std::stringstream ss;
+	ss << std::hex << std::setw(4) << std::setfill('0') << address + 4 << ": (";
+	ss << std::hex << std::setw(8) << std::setfill('0') << upper << ") ";
+	ss << disassemble_upper(upper, address + 4);
+	if(upper & I_BIT) ss << " [I]";
+	if(upper & E_BIT) ss << " [E]";
+	if(upper & M_BIT) ss << " [M]";
+	if(upper & D_BIT) ss << " [D]";
+	if(upper & T_BIT) ss << " [T]";
+	while(ss.str().size() < 64) ss << " ";
+	ss << std::hex << std::setw(4) << std::setfill('0') << address << ": (";
+	ss << std::hex << std::setw(8) << std::setfill('0') << lower << ") ";
+	if(upper & I_BIT) {
+		ss << *(float*) &lower;
+	} else {
+		ss << disassemble_lower(lower, address);
+	}
+	return ss.str();
 }
 
 void init_gui(GLFWwindow **window)

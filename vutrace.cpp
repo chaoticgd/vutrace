@@ -19,6 +19,7 @@
 #include <map>
 #include <string>
 #include <vector>
+#include <fstream>
 #include <iomanip>
 #include <sstream>
 #include <stdio.h>
@@ -70,6 +71,8 @@ struct AppState
 	bool disassembly_scroll_to = false;
 	std::vector<Instruction> instructions;
 	std::string disassembly_highlight;
+	std::array<std::string, VU1_PROGSIZE / 8> comments;
+	std::string trace_dir;
 };
 
 struct MessageBoxState
@@ -84,7 +87,8 @@ void registers_window(AppState &app);
 void memory_window(AppState &app);
 void disassembly_window(AppState &app);
 void gs_packet_window(AppState &app);
-std::vector<Snapshot> parse_trace(AppState &app, std::string dir_path);
+void parse_trace(AppState &app, std::string dir_path);
+void save_comments(AppState &app);
 std::string disassemble(u8 *program, u32 address);
 void init_gui(GLFWwindow **window);
 void begin_docking();
@@ -107,7 +111,7 @@ int main(int argc, char **argv)
 	init_gui(&window);
 	
 	AppState app;
-	app.snapshots = parse_trace(app, argv[1]);
+	parse_trace(app, argv[1]);
 
 	while(!glfwWindowShouldClose(window)) {
 		glfwPollEvents();
@@ -347,8 +351,12 @@ void disassembly_window(AppState &app)
 	ImGui::InputText("Highlight", &app.disassembly_highlight);
 	
 	ImGui::BeginChild("disasm");
+	ImGui::Columns(2);
+	ImGui::SetColumnWidth(0, 768);
 	
 	for(std::size_t i = 0; i < VU1_PROGSIZE; i += 8) {
+		ImGui::PushID(i);
+		
 		Instruction instruction = app.instructions[i / 8];
 		bool is_pc = current.registers.VI[TPC].UL == i;
 		ImGuiSelectableFlags flags = instruction.is_executed ?
@@ -425,8 +433,27 @@ void disassembly_window(AppState &app)
 				app.disassembly_scroll_to = true;
 			}
 		}
+		
+		ImGui::NextColumn();
+		if(!is_pc) {
+			ImGui::PushStyleColor(ImGuiCol_FrameBg, ImVec4(0.f, 0.f, 0.f, 0.f));
+		}
+		ImVec2 comment_size(ImGui::GetWindowSize().x - 768.f, 14.f);
+		std::string &comment = app.comments.at(i / 8);
+		ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(0, 0));
+		if(ImGui::InputText("##comment", &comment)) {
+			save_comments(app);
+		}
+		ImGui::PopStyleVar();
+		if(!is_pc) {
+			ImGui::PopStyleColor();
+		}
+		ImGui::NextColumn();
+		
+		ImGui::PopID();
 	}
 	
+	ImGui::Columns();
 	ImGui::EndChild();
 }
 
@@ -516,21 +543,18 @@ enum VUTracePacketType {
 	VUTRACE_STOREOP = 'S' // u32 address, u32 size follows.
 };
 
-std::vector<Snapshot> parse_trace(AppState &app, std::string dir_path)
+void parse_trace(AppState &app, std::string dir_path)
 {
 	std::vector<Snapshot> snapshots;
 	
-	std::string vu1_file = dir_path + "/vu1.bin";
+	app.trace_dir = dir_path;
+	std::string vu1_file = app.trace_dir + "/vu1.bin";
 	
 	FILE *trace = fopen(vu1_file.c_str(), "rb");
 	if(trace == nullptr) {
 		fprintf(stderr, "Error: Failed to read trace!\n");
 		exit(1);
 	}
-	
-	static const int reg_pos = 0x10;
-	static const int mem_pos = reg_pos + sizeof(VURegs) + 0x10;
-	static const int prog_pos = mem_pos + VU1_MEMSIZE + 0x10;
 	
 	app.instructions.resize(VU1_PROGSIZE / 8);
 	
@@ -541,18 +565,20 @@ std::vector<Snapshot> parse_trace(AppState &app, std::string dir_path)
 		}
 	};
 	
+	app.snapshots = {};
+	
 	Snapshot current;
 	VUTracePacketType packet_type;
 	while(fread(&packet_type, 1, 1, trace) == 1) {
 		switch(packet_type) {
 			case VUTRACE_PUSHSNAPSHOT: {
-				snapshots.push_back(current);
+				app.snapshots.push_back(current);
 				
 				u32 pc = current.registers.VI[TPC].UL;
 				Instruction &instruction = app.instructions[pc / 8];
 				instruction.is_executed = true;
 				
-				Snapshot &last = *(snapshots.end() - 2);
+				Snapshot &last = *(app.snapshots.end() - 2);
 				u32 last_pc = last.registers.VI[TPC].UL;
 				if(last_pc + 8 != pc) {
 					// A branch has taken place.
@@ -594,7 +620,23 @@ std::vector<Snapshot> parse_trace(AppState &app, std::string dir_path)
 	
 	fclose(trace);
 	
-	return snapshots;
+	std::string comment_path = app.trace_dir + "/comments.txt";
+	std::ifstream comment_file(comment_path);
+	if(comment_file) {
+		std::string line;
+		for(std::size_t i = 0; std::getline(comment_file, line) && i < VU1_PROGSIZE / 8; i++) {
+			app.comments[i] = line;
+		}
+	}
+}
+
+void save_comments(AppState &app)
+{
+	std::string comment_path = app.trace_dir + "/comments.txt";
+	std::ofstream comment_file(comment_path);
+	for(std::size_t i = 0; i < app.comments.size(); i++) {
+		comment_file << app.comments[i] << "\n";
+	}
 }
 
 std::string disassemble(u8 *program, u32 address)
@@ -610,7 +652,7 @@ std::string disassemble(u8 *program, u32 address)
 	} else {
 		ss << disassemble_lower(lower, address);
 	}
-	while(ss.str().size() < 64) ss << " ";
+	while(ss.str().size() < 48) ss << " ";
 	ss << std::hex << std::setw(4) << std::setfill('0') << address + 4 << ": (";
 	ss << std::hex << std::setw(8) << std::setfill('0') << upper << ") ";
 	ss << disassemble_upper(upper, address + 4);

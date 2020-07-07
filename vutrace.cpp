@@ -87,6 +87,7 @@ void registers_window(AppState &app);
 void memory_window(AppState &app);
 void disassembly_window(AppState &app);
 void gs_packet_window(AppState &app);
+bool walk_until_pc_equal(AppState &app, u32 target_pc, int step); // Add step to the current snapshot index until pc == target_pc. If not found return false.
 void parse_trace(AppState &app, std::string dir_path);
 void save_comments(AppState &app);
 std::string disassemble(u8 *program, u32 address);
@@ -162,6 +163,19 @@ void update_gui(AppState &app)
 
 void snapshots_window(AppState &app)
 {
+	
+	ImGui::AlignTextToFramePadding();
+	ImGui::Text("Iter:");
+	ImGui::SameLine();
+	u32 pc = app.snapshots[app.current_snapshot].registers.VI[TPC].UL;
+	if(ImGui::Button(" < ")) {
+		walk_until_pc_equal(app, pc, -1);
+	}
+	ImGui::SameLine();
+	if(ImGui::Button(" > ")) {
+		walk_until_pc_equal(app, pc, 1);
+	}
+	
 	std::function<bool(Snapshot &)> filter;
 	
 	if(ImGui::BeginTabBar("tabs")) {
@@ -183,7 +197,7 @@ void snapshots_window(AppState &app)
 	
 	ImVec2 size = ImGui::GetWindowSize();
 	size.x -= 16;
-	size.y -= 64;
+	size.y -= 82;
 	ImGui::PushItemWidth(-1);
 	if(ImGui::ListBoxHeader("##snapshots", size)) {
 		for(std::size_t i = 0; i < app.snapshots.size(); i++) {
@@ -403,33 +417,19 @@ void disassembly_window(AppState &app)
 		}
 		
 		if(!is_pc && clicked) {
-			int walk;
+			bool pc_changed = false;
 			if(current.registers.VI[TPC].UL > i) {
-				walk = -1;
+				pc_changed = walk_until_pc_equal(app, i, -1);
+				if(!pc_changed) {
+					pc_changed = walk_until_pc_equal(app, i, 1);
+				}
 			} else {
-				walk = 1;
-			}
-			int j = app.current_snapshot;
-			while(app.snapshots[j].registers.VI[TPC].UL != i) {
-				j += walk;
-				if(j < 0 || j >= app.snapshots.size()) {
-					j = -1;
-					break;
+				pc_changed = walk_until_pc_equal(app, i, 1);
+				if(!pc_changed) {
+					pc_changed = walk_until_pc_equal(app, i, -1);
 				}
 			}
-			if(j == -1) {
-				j = app.current_snapshot;
-				while(app.snapshots[j].registers.VI[TPC].UL != i) {
-					j -= walk;
-					if(j < 0 || j >= app.snapshots.size()) {
-						j = -1;
-						break;
-					}
-				}
-			}
-			if(j != -1) {
-				app.current_snapshot = j;
-				app.snapshots_scroll_to = true;
+			if(pc_changed) {
 				app.disassembly_scroll_to = true;
 			}
 		}
@@ -532,6 +532,20 @@ void gs_packet_window(AppState &app)
 		ImGui::NewLine();
 	}
 	ImGui::EndChild();
+}
+
+bool walk_until_pc_equal(AppState &app, u32 target_pc, int step)
+{
+	std::size_t snapshot = app.current_snapshot;
+	do {
+		if(-step > (int) snapshot || snapshot + step >= app.snapshots.size()) {
+			return false;
+		}
+		snapshot += step;
+	} while(app.snapshots[snapshot].registers.VI[TPC].UL != target_pc);
+	app.current_snapshot = snapshot;
+	app.snapshots_scroll_to = true;
+	return true;
 }
 
 enum VUTracePacketType {

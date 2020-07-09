@@ -362,6 +362,20 @@ void disassembly_window(AppState &app)
 {
 	Snapshot &current = app.snapshots[app.current_snapshot];
 	
+	static MessageBoxState export_box;
+	if(prompt(export_box, "Export Disassembly")) {
+		std::ofstream disassembly_out_file(export_box.text);
+		for(std::size_t i = 0; i < VU1_PROGSIZE; i+= 8) {
+			disassembly_out_file << disassemble(current.program, i);
+			if(app.comments.at(i / 8).size() > 0) {
+				disassembly_out_file << "; ";
+			}
+			disassembly_out_file << app.comments.at(i / 8);
+			disassembly_out_file << "\n";
+		}
+	}
+	ImGui::SameLine();
+	
 	ImGui::InputText("Highlight", &app.disassembly_highlight);
 	
 	ImGui::BeginChild("disasm");
@@ -666,7 +680,7 @@ std::string disassemble(u8 *program, u32 address)
 	} else {
 		ss << disassemble_lower(lower, address);
 	}
-	while(ss.str().size() < 48) ss << " ";
+	while(ss.str().size() < 50) ss << " ";
 	ss << std::hex << std::setw(4) << std::setfill('0') << address + 4 << ": (";
 	ss << std::hex << std::setw(8) << std::setfill('0') << upper << ") ";
 	ss << disassemble_upper(upper, address + 4);
@@ -675,6 +689,7 @@ std::string disassemble(u8 *program, u32 address)
 	if(upper & M_BIT) ss << " [M]";
 	if(upper & D_BIT) ss << " [D]";
 	if(upper & T_BIT) ss << " [T]";
+	while(ss.str().size() < 100) ss << " ";
 	return ss.str();
 }
 

@@ -362,6 +362,9 @@ void disassembly_window(AppState &app)
 {
 	Snapshot &current = app.snapshots[app.current_snapshot];
 	
+	ImGui::InputText("Highlight", &app.disassembly_highlight);
+	ImGui::SameLine();
+	
 	static MessageBoxState export_box;
 	if(prompt(export_box, "Export Disassembly")) {
 		std::ofstream disassembly_out_file(export_box.text);
@@ -374,9 +377,6 @@ void disassembly_window(AppState &app)
 			disassembly_out_file << "\n";
 		}
 	}
-	ImGui::SameLine();
-	
-	ImGui::InputText("Highlight", &app.disassembly_highlight);
 	
 	ImGui::BeginChild("disasm");
 	ImGui::Columns(2);

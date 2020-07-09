@@ -333,7 +333,7 @@ void memory_window(AppState &app)
 			static ImColor row_header_col = ImColor(1.f, 1.f, 1.f);
 			std::stringstream row_header;
 			row_header << std::hex << std::setfill('0') << std::setw(5) << i * ROW_SIZE;
-			dl->AddText(ImVec2(8, pos_y), row_header_col, row_header.str().c_str());
+			dl->AddText(ImVec2(ImGui::GetItemRectMin().x + 8, pos_y), row_header_col, row_header.str().c_str());
 			
 			u8 *data = current.memory + i * ROW_SIZE;
 			u8 *last_data = last->memory + i * ROW_SIZE;

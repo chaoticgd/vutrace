@@ -455,9 +455,11 @@ void disassembly_window(AppState &app)
 		ImVec2 comment_size(ImGui::GetWindowSize().x - 768.f, 14.f);
 		std::string &comment = app.comments.at(i / 8);
 		ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(0, 0));
+		ImGui::PushItemWidth(-1);
 		if(ImGui::InputText("##comment", &comment)) {
 			save_comments(app);
 		}
+		ImGui::PopItemWidth();
 		ImGui::PopStyleVar();
 		if(!is_pc) {
 			ImGui::PopStyleColor();

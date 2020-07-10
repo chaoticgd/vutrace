@@ -120,6 +120,17 @@ int main(int argc, char **argv)
 		ImGui_ImplOpenGL3_NewFrame();
 		ImGui_ImplGlfw_NewFrame();
 		ImGui::NewFrame();
+		
+		if(ImGui::IsKeyPressed('W') && app.current_snapshot > 0) {
+			app.current_snapshot--;
+			app.snapshots_scroll_to = true;
+			app.disassembly_scroll_to = true;
+		}
+		if(ImGui::IsKeyPressed('S') && app.current_snapshot < app.snapshots.size() - 1) {
+			app.current_snapshot++;
+			app.snapshots_scroll_to = true;
+			app.disassembly_scroll_to = true;
+		}
 
 		begin_docking();
 		update_gui(app);

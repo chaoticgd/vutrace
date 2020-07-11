@@ -113,6 +113,8 @@ int main(int argc, char **argv)
 	
 	AppState app;
 	parse_trace(app, argv[1]);
+	
+	ImGuiContext &g = *GImGui;
 
 	while(!glfwWindowShouldClose(window)) {
 		glfwPollEvents();
@@ -121,15 +123,17 @@ int main(int argc, char **argv)
 		ImGui_ImplGlfw_NewFrame();
 		ImGui::NewFrame();
 		
-		if(ImGui::IsKeyPressed('W') && app.current_snapshot > 0) {
-			app.current_snapshot--;
-			app.snapshots_scroll_to = true;
-			app.disassembly_scroll_to = true;
-		}
-		if(ImGui::IsKeyPressed('S') && app.current_snapshot < app.snapshots.size() - 1) {
-			app.current_snapshot++;
-			app.snapshots_scroll_to = true;
-			app.disassembly_scroll_to = true;
+		if(g.InputTextState.ID == 0 || g.InputTextState.ID != ImGui::GetActiveID()) {
+			if(ImGui::IsKeyPressed('W') && app.current_snapshot > 0) {
+				app.current_snapshot--;
+				app.snapshots_scroll_to = true;
+				app.disassembly_scroll_to = true;
+			}
+			if(ImGui::IsKeyPressed('S') && app.current_snapshot < app.snapshots.size() - 1) {
+				app.current_snapshot++;
+				app.snapshots_scroll_to = true;
+				app.disassembly_scroll_to = true;
+			}
 		}
 
 		begin_docking();

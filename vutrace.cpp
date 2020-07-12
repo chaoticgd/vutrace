@@ -37,12 +37,6 @@
 #include "pcsx2disassemble.h"
 #include "gif.h"
 
-static const u32 I_BIT = 1 << 31;
-static const u32 E_BIT = 1 << 30;
-static const u32 M_BIT = 1 << 29;
-static const u32 D_BIT = 1 << 28;
-static const u32 T_BIT = 1 << 27;
-
 struct Snapshot
 {
 	VURegs registers;
@@ -235,7 +229,8 @@ void snapshots_window(AppState &app)
 				ss << " WRITE 0x" << std::hex << next_snap.write_addr;
 			}
 			
-			std::string disassembly = disassemble(snap.program, snap.registers.VI[TPC].UL);
+			u32 pc = snap.registers.VI[TPC].UL;
+			std::string disassembly = disassemble(&snap.program[pc], pc);
 			
 			bool is_highlighted =
 			app.disassembly_highlight.size() > 0 &&
@@ -406,7 +401,7 @@ void disassembly_window(AppState &app)
 			ImGuiSelectableFlags_None :
 			ImGuiSelectableFlags_Disabled;
 		
-		std::string disassembly = disassemble(current.program, i);
+		std::string disassembly = disassemble(&current.program[i], i);
 		
 		if(instruction.branch_from_times.size() > 0) {
 			std::stringstream addresses;
@@ -682,32 +677,6 @@ void save_comments(AppState &app)
 	for(std::size_t i = 0; i < app.comments.size(); i++) {
 		comment_file << app.comments[i] << "\n";
 	}
-}
-
-std::string disassemble(u8 *program, u32 address)
-{
-	u32 upper = *(u32*) &program[address + 4];
-	u32 lower = *(u32*) &program[address];
-	
-	std::stringstream ss;
-	ss << std::hex << std::setw(4) << std::setfill('0') << address << ": (";
-	ss << std::hex << std::setw(8) << std::setfill('0') << lower << ") ";
-	if(upper & I_BIT) {
-		ss << *(float*) &lower;
-	} else {
-		ss << disassemble_lower(lower, address);
-	}
-	while(ss.str().size() < 50) ss << " ";
-	ss << std::hex << std::setw(4) << std::setfill('0') << address + 4 << ": (";
-	ss << std::hex << std::setw(8) << std::setfill('0') << upper << ") ";
-	ss << disassemble_upper(upper, address + 4);
-	if(upper & I_BIT) ss << " [I]";
-	if(upper & E_BIT) ss << " [E]";
-	if(upper & M_BIT) ss << " [M]";
-	if(upper & D_BIT) ss << " [D]";
-	if(upper & T_BIT) ss << " [T]";
-	while(ss.str().size() < 100) ss << " ";
-	return ss.str();
 }
 
 void init_gui(GLFWwindow **window)

@@ -20,9 +20,45 @@
 #define PCSX2_DISASSEMBLE
 
 #include <string>
+#include <sstream>
 #include <stdint.h>
 
 #include "pcsx2defs.h"
+
+std::string disassemble_lower(uint32_t insn, uint32_t pc);
+std::string disassemble_upper(uint32_t insn, uint32_t pc);
+
+static const u32 I_BIT = 1 << 31;
+static const u32 E_BIT = 1 << 30;
+static const u32 M_BIT = 1 << 29;
+static const u32 D_BIT = 1 << 28;
+static const u32 T_BIT = 1 << 27;
+
+std::string disassemble(u8 *instruction, u32 address)
+{
+	u32 upper = *(u32*) &instruction[4];
+	u32 lower = *(u32*) &instruction[0];
+	
+	std::stringstream ss;
+	ss << std::hex << std::setw(4) << std::setfill('0') << address << ": (";
+	ss << std::hex << std::setw(8) << std::setfill('0') << lower << ") ";
+	if(upper & I_BIT) {
+		ss << *(float*) &lower;
+	} else {
+		ss << disassemble_lower(lower, address);
+	}
+	while(ss.str().size() < 50) ss << " ";
+	ss << std::hex << std::setw(4) << std::setfill('0') << address + 4 << ": (";
+	ss << std::hex << std::setw(8) << std::setfill('0') << upper << ") ";
+	ss << disassemble_upper(upper, address + 4);
+	if(upper & I_BIT) ss << " [I]";
+	if(upper & E_BIT) ss << " [E]";
+	if(upper & M_BIT) ss << " [M]";
+	if(upper & D_BIT) ss << " [D]";
+	if(upper & T_BIT) ss << " [T]";
+	while(ss.str().size() < 100) ss << " ";
+	return ss.str();
+}
 
 #define mVUop(mnenomic) void mVU_##mnenomic (std::string &result, uint32_t insn, uint32_t pc)
 #define mVUlog( ...) \

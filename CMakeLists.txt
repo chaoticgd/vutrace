@@ -15,6 +15,10 @@ add_executable(vutrace
 	imgui/misc/cpp/imgui_stdlib.cpp
 )
 
+add_executable(vudis
+	vudis.cpp
+)
+
 add_subdirectory(glad)
 add_subdirectory(glfw)
 target_link_libraries(vutrace glad glfw)

@@ -128,6 +128,14 @@ int main(int argc, char **argv)
 				app.snapshots_scroll_to = true;
 				app.disassembly_scroll_to = true;
 			}
+			
+			u32 pc = app.snapshots[app.current_snapshot].registers.VI[TPC].UL;
+			if(ImGui::IsKeyPressed('A')) {
+				walk_until_pc_equal(app, pc, -1);
+			}
+			if(ImGui::IsKeyPressed('D')) {
+				walk_until_pc_equal(app, pc, 1);
+			}
 		}
 
 		begin_docking();

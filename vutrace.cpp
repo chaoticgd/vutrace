@@ -744,7 +744,7 @@ void create_dock_layout(GLFWwindow *window)
 	ImGui::DockBuilderSetNodeSize(dockspace_id, ImVec2(width, height));
 	
 	ImGuiID top, bottom;
-	ImGui::DockBuilderSplitNode(dockspace_id, ImGuiDir_Up, 0.5f, &top, &bottom);
+	ImGui::DockBuilderSplitNode(dockspace_id, ImGuiDir_Up, 0.75f, &top, &bottom);
 	
 	ImGuiID registers, middle;
 	ImGui::DockBuilderSplitNode(top, ImGuiDir_Left, 1.f / 3.f, &registers, &middle);

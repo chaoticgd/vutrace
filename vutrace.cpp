@@ -262,9 +262,16 @@ void registers_window(AppState &app)
 	Snapshot &current = app.snapshots[app.current_snapshot];
 	VURegs &regs = current.registers;
 	
-	auto draw_vec_reg = [](const char *name, VECTOR value) {
-		ImGui::Text("%s = %.4f %.4f %.4f %.4f",
-			name, value.F[0], value.F[1], value.F[2], value.F[3]);
+	static bool show_as_hex = false;
+	
+	auto draw_vec_reg = [&](const char *name, VECTOR value) {
+		if(show_as_hex) {
+			ImGui::Text("%s = %08x %08x %08x %08x",
+				name, value.UL[0], value.UL[1], value.UL[2], value.UL[3]);
+		} else {
+			ImGui::Text("%s = %.4f %.4f %.4f %.4f",
+				name, value.F[0], value.F[1], value.F[2], value.F[3]);
+		}
 	};
 	
 	auto draw_int_reg = [](const char *name, REG_VI value) {
@@ -272,6 +279,8 @@ void registers_window(AppState &app)
 	};
 	
 	ImGui::Columns(2);
+		ImGui::Checkbox("Show as Hex", &show_as_hex);
+	
 		for(int i = 0; i < 32; i++) {
 			std::string name = std::string("vf") + std::to_string(i);
 			draw_vec_reg(name.c_str(), regs.VF[i]);

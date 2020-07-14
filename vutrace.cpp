@@ -264,50 +264,36 @@ void registers_window(AppState &app)
 	
 	static bool show_as_hex = false;
 	
-	auto draw_vec_reg = [&](const char *name, VECTOR value) {
-		if(show_as_hex) {
-			ImGui::Text("%s = %08x %08x %08x %08x",
-				name, value.UL[0], value.UL[1], value.UL[2], value.UL[3]);
-		} else {
-			ImGui::Text("%s = %.4f %.4f %.4f %.4f",
-				name, value.F[0], value.F[1], value.F[2], value.F[3]);
-		}
-	};
-	
-	auto draw_int_reg = [](const char *name, REG_VI value) {
-		ImGui::Text("%s = 0x%x = %hd", name, value.UL, value.UL);
-	};
-	
 	ImGui::Columns(2);
 		ImGui::Checkbox("Show as Hex", &show_as_hex);
 	
 		for(int i = 0; i < 32; i++) {
-			std::string name = std::string("vf") + std::to_string(i);
-			draw_vec_reg(name.c_str(), regs.VF[i]);
+			VECTOR value = regs.VF[i];
+			if(show_as_hex) {
+				ImGui::Text("vf%02d = %08x %08x %08x %08x",
+					i, value.UL[0], value.UL[1], value.UL[2], value.UL[3]);
+			} else {
+				ImGui::Text("vf%02d = %.4f %.4f %.4f %.4f",
+					i, value.F[0], value.F[1], value.F[2], value.F[3]);
+			}
 		}
 	ImGui::NextColumn();
 	ImGui::SetColumnWidth(1, 192);
 	ImGui::SetColumnOffset(1, ImGui::GetWindowSize().x - 192);
-		for(int i = 0; i < 16; i++) {
-			std::string name = std::string("vi") + std::to_string(i);
-			draw_int_reg(name.c_str(), regs.VI[i]);
+		static const char *integer_register_names[] = {
+			"vi00", "vi01", "vi02", "vi03",
+			"vi04", "vi05", "vi06", "vi07",
+			"vi08", "vi09", "vi10", "vi11",
+			"vi12", "vi13", "vi14", "vi15",
+			"Status", "MACflag", "ClipFlag", "c2c19",
+			"R", "I", "Q", "c2c23",
+			"c2c24", "c2c25", "TPC", "CMSAR0",
+			"FBRST", "VPU-STAT", "c2c30", "CMSAR1",
+		};
+	
+		for(int i = 0; i < 32; i++) {
+			ImGui::Text("%s = 0x%x = %hd", integer_register_names[i], regs.VI[i].UL, regs.VI[i].UL);
 		}
-		draw_int_reg("Status", regs.VI[16]);
-		draw_int_reg("MACflag", regs.VI[17]);
-		draw_int_reg("ClipFlag", regs.VI[18]);
-		draw_int_reg("c2c19", regs.VI[19]);
-		draw_int_reg("R", regs.VI[20]);
-		draw_int_reg("I", regs.VI[21]);
-		draw_int_reg("Q", regs.VI[22]);
-		draw_int_reg("c2c23", regs.VI[23]);
-		draw_int_reg("c2c24", regs.VI[24]);
-		draw_int_reg("c2c25", regs.VI[25]);
-		draw_int_reg("TPC", regs.VI[26]);
-		draw_int_reg("CMSAR0", regs.VI[27]);
-		draw_int_reg("FBRST", regs.VI[28]);
-		draw_int_reg("VPU-STAT", regs.VI[29]);
-		draw_int_reg("c2c30", regs.VI[30]);
-		draw_int_reg("CMSAR1", regs.VI[31]);
 	ImGui::Columns(1);
 }
 

@@ -382,7 +382,7 @@ void disassembly_window(AppState &app)
 	if(prompt(export_box, "Export Disassembly")) {
 		std::ofstream disassembly_out_file(export_box.text);
 		for(std::size_t i = 0; i < VU1_PROGSIZE; i+= 8) {
-			disassembly_out_file << disassemble(current.program, i);
+			disassembly_out_file << disassemble(&current.program[i], i);
 			if(app.comments.at(i / 8).size() > 0) {
 				disassembly_out_file << "; ";
 			}

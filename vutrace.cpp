@@ -645,7 +645,10 @@ void parse_trace(AppState &app, std::string trace_file_path)
 				}
 				instruction.times_executed++;
 				
-				current = {};
+				current.read_addr = 0;
+				current.read_size = 0;
+				current.write_addr = 0;
+				current.write_size = 0;
 				break;
 			}
 			case VUTRACE_SETREGISTERS:

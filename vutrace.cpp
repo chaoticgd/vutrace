@@ -37,6 +37,8 @@
 #include "pcsx2disassemble.h"
 #include "gif.h"
 
+static const int INSN_PAIR_SIZE = 8;
+
 struct Snapshot
 {
 	VURegs registers;
@@ -68,7 +70,7 @@ struct AppState
 	std::string trace_file_path;
 	bool comments_loaded = false;
 	std::string comment_file_path;
-	std::array<std::string, VU1_PROGSIZE / 8> comments;
+	std::array<std::string, VU1_PROGSIZE / INSN_PAIR_SIZE> comments;
 };
 
 struct MessageBoxState
@@ -386,12 +388,12 @@ void disassembly_window(AppState &app)
 	static MessageBoxState export_box;
 	if(prompt(export_box, "Export Disassembly")) {
 		std::ofstream disassembly_out_file(export_box.text);
-		for(std::size_t i = 0; i < VU1_PROGSIZE; i+= 8) {
+		for(std::size_t i = 0; i < VU1_PROGSIZE; i+= INSN_PAIR_SIZE) {
 			disassembly_out_file << disassemble(&current.program[i], i);
-			if(app.comments.at(i / 8).size() > 0) {
+			if(app.comments.at(i / INSN_PAIR_SIZE).size() > 0) {
 				disassembly_out_file << "; ";
 			}
-			disassembly_out_file << app.comments.at(i / 8);
+			disassembly_out_file << app.comments.at(i / INSN_PAIR_SIZE);
 			disassembly_out_file << "\n";
 		}
 	}
@@ -406,10 +408,10 @@ void disassembly_window(AppState &app)
 	ImGui::Columns(2);
 	ImGui::SetColumnWidth(0, 768);
 	
-	for(std::size_t i = 0; i < VU1_PROGSIZE; i += 8) {
+	for(std::size_t i = 0; i < VU1_PROGSIZE; i += INSN_PAIR_SIZE) {
 		ImGui::PushID(i);
 		
-		Instruction instruction = app.instructions[i / 8];
+		Instruction instruction = app.instructions[i / INSN_PAIR_SIZE];
 		bool is_pc = current.registers.VI[TPC].UL == i;
 		ImGuiSelectableFlags flags = instruction.is_executed ?
 			ImGuiSelectableFlags_None :
@@ -477,7 +479,7 @@ void disassembly_window(AppState &app)
 			ImGui::PushStyleColor(ImGuiCol_FrameBg, ImVec4(0.f, 0.f, 0.f, 0.f));
 		}
 		ImVec2 comment_size(ImGui::GetWindowSize().x - 768.f, 14.f);
-		std::string &comment = app.comments.at(i / 8);
+		std::string &comment = app.comments.at(i / INSN_PAIR_SIZE);
 		ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(0, 0));
 		ImGui::PushItemWidth(-1);
 		ImGuiInputTextFlags comment_flags = app.comments_loaded ?
@@ -612,7 +614,7 @@ void parse_trace(AppState &app, std::string trace_file_path)
 		exit(1);
 	}
 	
-	app.instructions.resize(VU1_PROGSIZE / 8);
+	app.instructions.resize(VU1_PROGSIZE / INSN_PAIR_SIZE);
 	
 	auto check_eof = [](int n) {
 		if(n != 1) {
@@ -631,14 +633,14 @@ void parse_trace(AppState &app, std::string trace_file_path)
 				app.snapshots.push_back(current);
 				
 				u32 pc = current.registers.VI[TPC].UL;
-				Instruction &instruction = app.instructions[pc / 8];
+				Instruction &instruction = app.instructions[pc / INSN_PAIR_SIZE];
 				instruction.is_executed = true;
 				
 				Snapshot &last = *(app.snapshots.end() - 2);
 				u32 last_pc = last.registers.VI[TPC].UL;
-				if(last_pc + 8 != pc) {
+				if(last_pc + INSN_PAIR_SIZE != pc) {
 					// A branch has taken place.
-					app.instructions[last_pc / 8].branch_to_times[pc]++;
+					app.instructions[last_pc / INSN_PAIR_SIZE].branch_to_times[pc]++;
 					instruction.branch_from_times[last_pc]++;
 				}
 				instruction.times_executed++;
@@ -682,7 +684,7 @@ void parse_comment_file(AppState &app, std::string comment_file_path) {
 	std::ifstream comment_file(comment_file_path);
 	if(comment_file) {
 		std::string line;
-		for(std::size_t i = 0; std::getline(comment_file, line) && i < VU1_PROGSIZE / 8; i++) {
+		for(std::size_t i = 0; std::getline(comment_file, line) && i < VU1_PROGSIZE / INSN_PAIR_SIZE; i++) {
 			app.comments[i] = line;
 		}
 		app.comments_loaded = true;

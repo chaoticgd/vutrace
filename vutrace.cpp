@@ -636,12 +636,14 @@ void parse_trace(AppState &app, std::string trace_file_path)
 				Instruction &instruction = app.instructions[pc / INSN_PAIR_SIZE];
 				instruction.is_executed = true;
 				
-				Snapshot &last = *(app.snapshots.end() - 2);
-				u32 last_pc = last.registers.VI[TPC].UL;
-				if(last_pc + INSN_PAIR_SIZE != pc) {
-					// A branch has taken place.
-					app.instructions[last_pc / INSN_PAIR_SIZE].branch_to_times[pc]++;
-					instruction.branch_from_times[last_pc]++;
+				if(app.snapshots.size() >= 2) {
+					Snapshot &last = app.snapshots.at(app.snapshots.size() - 2);
+					u32 last_pc = last.registers.VI[TPC].UL;
+					if(last_pc + INSN_PAIR_SIZE != pc) {
+						// A branch has taken place.
+						app.instructions[last_pc / INSN_PAIR_SIZE].branch_to_times[pc]++;
+						instruction.branch_from_times[last_pc]++;
+					}
 				}
 				instruction.times_executed++;
 				

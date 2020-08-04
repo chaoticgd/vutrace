@@ -152,7 +152,7 @@ GsPacket read_gs_packet(u8 *data, int size)
 		u64 high_tag = *(u64*) &data[pos];
 		pos += 8;
 		
-		prim.tag = read_gif_tag(high_tag, low_tag); prim.tag.eop = 1;
+		prim.tag = read_gif_tag(high_tag, low_tag);
 		
 		if(prim.tag.flag == GIFFLAG_PACKED) {
 			for(int i = 0; i < prim.tag.nloop; i++) {

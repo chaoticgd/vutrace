@@ -65,8 +65,10 @@ struct AppState
 	bool disassembly_scroll_to = false;
 	std::vector<Instruction> instructions;
 	std::string disassembly_highlight;
+	std::string trace_file_path;
+	bool comments_loaded = false;
+	std::string comment_file_path;
 	std::array<std::string, VU1_PROGSIZE / 8> comments;
-	std::string trace_dir;
 };
 
 struct MessageBoxState
@@ -82,8 +84,9 @@ void memory_window(AppState &app);
 void disassembly_window(AppState &app);
 void gs_packet_window(AppState &app);
 bool walk_until_pc_equal(AppState &app, u32 target_pc, int step); // Add step to the current snapshot index until pc == target_pc. If not found return false.
-void parse_trace(AppState &app, std::string dir_path);
-void save_comments(AppState &app);
+void parse_trace(AppState &app, std::string trace_file_path);
+void parse_comment_file(AppState &app, std::string comment_file_path);
+void save_comment_file(AppState &app);
 std::string disassemble(u8 *program, u32 address);
 void init_gui(GLFWwindow **window);
 void begin_docking();
@@ -97,7 +100,7 @@ size_t from_hex(const std::string& in);
 int main(int argc, char **argv)
 {
 	if(argc != 2) {
-		fprintf(stderr, "You must specify a trace directory.\n");
+		fprintf(stderr, "You must specify a trace file.\n");
 		return 1;
 	}
 	
@@ -375,7 +378,9 @@ void disassembly_window(AppState &app)
 {
 	Snapshot &current = app.snapshots[app.current_snapshot];
 	
+	ImGui::PushItemWidth(ImGui::GetWindowWidth() - 363);
 	ImGui::InputText("Highlight", &app.disassembly_highlight);
+	ImGui::PopItemWidth();
 	ImGui::SameLine();
 	
 	static MessageBoxState export_box;
@@ -389,6 +394,12 @@ void disassembly_window(AppState &app)
 			disassembly_out_file << app.comments.at(i / 8);
 			disassembly_out_file << "\n";
 		}
+	}
+	
+	ImGui::SameLine();
+	static MessageBoxState comment_box;
+	if(prompt(comment_box, "Load Comment File")) {
+		parse_comment_file(app, comment_box.text);
 	}
 	
 	ImGui::BeginChild("disasm");
@@ -469,8 +480,11 @@ void disassembly_window(AppState &app)
 		std::string &comment = app.comments.at(i / 8);
 		ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(0, 0));
 		ImGui::PushItemWidth(-1);
-		if(ImGui::InputText("##comment", &comment)) {
-			save_comments(app);
+		ImGuiInputTextFlags comment_flags = app.comments_loaded ?
+			ImGuiInputTextFlags_None :
+			ImGuiInputTextFlags_ReadOnly;
+		if(ImGui::InputText("##comment", &comment, comment_flags)) {
+			save_comment_file(app);
 		}
 		ImGui::PopItemWidth();
 		ImGui::PopStyleVar();
@@ -586,14 +600,13 @@ enum VUTracePacketType {
 	VUTRACE_STOREOP = 'S' // u32 address, u32 size follows.
 };
 
-void parse_trace(AppState &app, std::string dir_path)
+void parse_trace(AppState &app, std::string trace_file_path)
 {
 	std::vector<Snapshot> snapshots;
 	
-	app.trace_dir = dir_path;
-	std::string vu1_file = app.trace_dir + "/vu1.bin";
+	app.trace_file_path = trace_file_path;
 	
-	FILE *trace = fopen(vu1_file.c_str(), "rb");
+	FILE *trace = fopen(trace_file_path.c_str(), "rb");
 	if(trace == nullptr) {
 		fprintf(stderr, "Error: Failed to read trace!\n");
 		exit(1);
@@ -662,21 +675,23 @@ void parse_trace(AppState &app, std::string dir_path)
 	}
 	
 	fclose(trace);
-	
-	std::string comment_path = app.trace_dir + "/comments.txt";
-	std::ifstream comment_file(comment_path);
+}
+
+void parse_comment_file(AppState &app, std::string comment_file_path) {
+	app.comment_file_path = comment_file_path;
+	std::ifstream comment_file(comment_file_path);
 	if(comment_file) {
 		std::string line;
 		for(std::size_t i = 0; std::getline(comment_file, line) && i < VU1_PROGSIZE / 8; i++) {
 			app.comments[i] = line;
 		}
+		app.comments_loaded = true;
 	}
 }
 
-void save_comments(AppState &app)
+void save_comment_file(AppState &app)
 {
-	std::string comment_path = app.trace_dir + "/comments.txt";
-	std::ofstream comment_file(comment_path);
+	std::ofstream comment_file(app.comment_file_path);
 	for(std::size_t i = 0; i < app.comments.size(); i++) {
 		comment_file << app.comments[i] << "\n";
 	}

@@ -563,18 +563,27 @@ void gs_packet_window(AppState &app)
 	ImGui::NewLine();
 	
 	ImGui::BeginChild("data");
-	for(const GsPackedData& data : prim.packed_data) {
-		ImGui::Text("%x: %6s", data.source_address, gs_register_name(data.reg));
+	for(const GsPackedData& item : prim.packed_data) {
+		ImGui::Text("%x: %6s", item.source_address, gs_register_name(item.reg));
 		ImGui::SameLine();
-		for(std::size_t i = 0; i < 0x10; i += 4) {
-			ImGui::Text("%02x%02x%02x%02x",
-				data.buffer[i + 0],
-				data.buffer[i + 1],
-				data.buffer[i + 2],
-				data.buffer[i + 3]);
-			ImGui::SameLine();
+		switch(item.reg) {
+			case GSREG_AD: {
+				ImGui::Text("%s <- %lx\n", gs_register_name(item.ad.addr), item.ad.data);
+				break;
+			}
+			default: {
+				// Hex dump the raw data.
+				for(std::size_t i = 0; i < 0x10; i += 4) {
+					ImGui::Text("%02x%02x%02x%02x",
+						item.buffer[i + 0],
+						item.buffer[i + 1],
+						item.buffer[i + 2],
+						item.buffer[i + 3]);
+					ImGui::SameLine();
+				}
+				ImGui::NewLine();
+			}
 		}
-		ImGui::NewLine();
 	}
 	ImGui::EndChild();
 }

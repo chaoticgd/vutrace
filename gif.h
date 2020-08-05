@@ -108,9 +108,15 @@ struct GifTag
 
 struct GsPackedData
 {
-	GsRegister reg;
-	int source_address;
 	u8 buffer[0x10];
+	int source_address;
+	GsRegister reg;
+	union {
+		struct {
+			GsRegister addr;
+			uint64_t data;
+		} ad;
+	};
 };
 
 struct GsRegListData
@@ -133,6 +139,7 @@ struct GsPacket
 
 GsPacket read_gs_packet(u8 *data, int size);
 GifTag read_gif_tag(u64 high_part, u64 low_part);
+void interpret_packed_data(GsPackedData &item);
 int bit_range(u64 val, int lo, int hi);
 
 GsPacket read_gs_packet(u8 *data, int size)
@@ -162,10 +169,11 @@ GsPacket read_gs_packet(u8 *data, int size)
 						fprintf(stderr, "GS packet data overflowed VU memory!\n");
 						return packet;
 					}
-					item.reg = prim.tag.regs[j];
-					item.source_address = VU1_MEMSIZE - size + pos;
 					memcpy(item.buffer, &data[pos], 0x10);
 					pos += 0x10;
+					item.source_address = VU1_MEMSIZE - size + pos;
+					item.reg = prim.tag.regs[j];
+					interpret_packed_data(item);
 					prim.packed_data.push_back(item);
 				}
 			}
@@ -205,6 +213,21 @@ GifTag read_gif_tag(u64 high_part, u64 low_part)
 		tag.regs.push_back((GsRegister) bit_range(high_part, i * 4, i * 4 + 3));
 	}
 	return tag;
+}
+
+void interpret_packed_data(GsPackedData &item)
+{
+	u64 lo = *(u64*) &item.buffer[0];
+	u64 hi = *(u64*) &item.buffer[8];
+	
+	switch(item.reg) {
+		case GSREG_AD: {
+			// I'm not sure if we should be ignoring the high bits of ADDR.
+			item.ad.addr = (GsRegister) bit_range(hi, 0, 3);
+			item.ad.data = lo;
+			break;
+		}
+	}
 }
 
 const char *gif_flag_name(GifFlag flag)

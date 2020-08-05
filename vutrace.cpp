@@ -90,6 +90,7 @@ void parse_trace(AppState &app, std::string trace_file_path);
 void parse_comment_file(AppState &app, std::string comment_file_path);
 void save_comment_file(AppState &app);
 std::string disassemble(u8 *program, u32 address);
+bool is_xgkick(u32 lower);
 void init_gui(GLFWwindow **window);
 void begin_docking();
 void create_dock_layout(GLFWwindow *window);
@@ -209,8 +210,7 @@ void snapshots_window(AppState &app)
 			filter = [&](Snapshot &snapshot) {
 				u32 pc = snapshot.registers.VI[TPC].UL;
 				u32 lower = *(u32*) &snapshot.program[pc];
-				std::string disassembly = disassemble_lower(lower, pc);
-				return disassembly[0] == 'X' && disassembly[1] == 'G';
+				return is_xgkick(lower);
 			};
 			ImGui::EndTabItem();
 		}
@@ -509,15 +509,25 @@ void gs_packet_window(AppState &app)
 	static std::string address_hex;
 	ImGui::InputText("Address", &address_hex);
 	
+	Snapshot &snap = app.snapshots[app.current_snapshot];
+	
+	std::size_t address;
 	if(address_hex.size() == 0) {
-		return;
+		u32 pc = snap.registers.VI[TPC].UL;
+		u32 lower = *(u32*) &snap.program[pc];
+		if(is_xgkick(lower)) {
+			u32 is = bit_range(lower, 11, 15);
+			address = snap.registers.VI[is].UL * 0x10;
+		} else {
+			return;
+		}
+	} else {
+		address = from_hex(address_hex);
 	}
 	
-	std::size_t address = from_hex(address_hex);
 	if(address < 0) address = 0;
 	if(address > VU1_MEMSIZE) address = VU1_MEMSIZE;
 	
-	Snapshot &snap = app.snapshots[app.current_snapshot];
 	GsPacket packet = read_gs_packet(&snap.memory[address], VU1_MEMSIZE - address);
 	
 	ImGui::BeginChild("primlist");
@@ -711,6 +721,11 @@ void save_comment_file(AppState &app)
 	for(std::size_t i = 0; i < app.comments.size(); i++) {
 		comment_file << app.comments[i] << "\n";
 	}
+}
+
+bool is_xgkick(u32 lower)
+{
+	return bit_range(lower, 0, 10) == 0b11011111100;
 }
 
 void init_gui(GLFWwindow **window)

@@ -1,0 +1,610 @@
+diff --git a/common/include/PS2Edefs.h b/common/include/PS2Edefs.h
+index 8fa7245da..a11f45651 100644
+--- a/common/include/PS2Edefs.h
++++ b/common/include/PS2Edefs.h
+@@ -562,6 +562,7 @@ typedef void(CALLBACK *_GSreset)();
+ typedef void(CALLBACK *_GSwriteCSR)(u32 value);
+ typedef void(CALLBACK *_GSmakeSnapshot)(const char *path);
+ typedef void(CALLBACK *_GSmakeSnapshot2)(const char *path, int *, int);
++typedef void(CALLBACK *_GSvutraceSetTraceIndex)(int);
+ 
+ // PAD
+ typedef s32(CALLBACK *_PADinit)(u32 flags);
+diff --git a/pcsx2/MTGS.cpp b/pcsx2/MTGS.cpp
+index 1c4a0ee2d..26c9f83a4 100644
+--- a/pcsx2/MTGS.cpp
++++ b/pcsx2/MTGS.cpp
+@@ -271,6 +271,8 @@ class RingBufferLock {
+ 	}
+ };
+ 
++void GS_vutraceSetTraceIndex(int index);
++
+ void SysMtgsThread::ExecuteTaskInThread()
+ {
+ 	// Threading info: run in MTGS thread
+@@ -318,7 +320,9 @@ void SysMtgsThread::ExecuteTaskInThread()
+ 			ringposStack.pop_back();
+ 			m_lock_Stack.Release();
+ #endif
+-
++			
++			GS_vutraceSetTraceIndex(VUTracer::get().trace_index);
++			
+ 			switch( tag.command )
+ 			{
+ #if COPY_GS_PACKET_TO_MTGS == 1
+diff --git a/pcsx2/PluginManager.cpp b/pcsx2/PluginManager.cpp
+index 99764c02a..b6e1efbc3 100644
+--- a/pcsx2/PluginManager.cpp
++++ b/pcsx2/PluginManager.cpp
+@@ -182,6 +182,7 @@ _GSsetExclusive		GSsetExclusive;
+ _GSsetupRecording	GSsetupRecording;
+ _GSreset			GSreset;
+ _GSwriteCSR			GSwriteCSR;
++_GSvutraceSetTraceIndex GSvutraceSetTraceIndex;
+ #endif
+ 
+ static void CALLBACK GS_makeSnapshot(const char *path) {}
+@@ -192,6 +193,10 @@ static void CALLBACK GS_setVsync(int enabled) {}
+ static void CALLBACK GS_setExclusive(int isExcl) {}
+ static void CALLBACK GS_changeSaveState( int, const char* filename ) {}
+ 
++void GS_vutraceSetTraceIndex(int index) {
++	GSvutraceSetTraceIndex(index);
++}
++
+ void CALLBACK GS_getTitleInfo2( char* dest, size_t length )
+ {
+ 	// Just return a generic "GS" title -- a plugin actually implementing this feature
+@@ -399,6 +404,7 @@ static const LegacyApi_ReqMethod s_MethMessReq_GS[] =
+ 	{	"GSsetExclusive",	(vMeth**)&GSsetExclusive,	(vMeth*)GS_setExclusive	},
+ 	{	"GSchangeSaveState",(vMeth**)&GSchangeSaveState,(vMeth*)GS_changeSaveState },
+ 	{	"GSgetTitleInfo2",	(vMeth**)&GSgetTitleInfo2,	(vMeth*)GS_getTitleInfo2 },
++	{	"GSvutraceSetTraceIndex",	(vMeth**)&GSvutraceSetTraceIndex, NULL	},
+ 	{ NULL }
+ };
+ 
+diff --git a/pcsx2/VU1micro.cpp b/pcsx2/VU1micro.cpp
+index 6dfb72a4d..e35f7972b 100644
+--- a/pcsx2/VU1micro.cpp
++++ b/pcsx2/VU1micro.cpp
+@@ -56,6 +56,8 @@ void __fastcall vu1ExecMicro(u32 addr)
+ 	static int count = 0;
+ 	vu1Finish();
+ 
++	VUTracer::get().onVu1ExecMicro(addr);
++
+ 	VUM_LOG("vu1ExecMicro %x (count=%d)", addr, count++);
+ 
+ 	VU0.VI[REG_VPU_STAT].UL &= ~0xFF00;
+diff --git a/pcsx2/VU1microInterp.cpp b/pcsx2/VU1microInterp.cpp
+index eafd87733..89f75fa72 100644
+--- a/pcsx2/VU1microInterp.cpp
++++ b/pcsx2/VU1microInterp.cpp
+@@ -206,6 +206,7 @@ void InterpVU1::Step()
+ {
+ 	VU1.VI[REG_TPC].UL &= VU1_PROGMASK;
+ 	vu1Exec( &VU1 );
++	VUTracer::get().onInstructionExecuted(&VU1);
+ }
+ 
+ void InterpVU1::Execute(u32 cycles)
+diff --git a/pcsx2/VUops.cpp b/pcsx2/VUops.cpp
+index bdac36485..851705d90 100644
+--- a/pcsx2/VUops.cpp
++++ b/pcsx2/VUops.cpp
+@@ -1638,11 +1638,27 @@ static __fi void _vuMR32(VURegs * VU) {
+ //  Load / Store Instructions (VU Interpreter)
+ // --------------------------------------------------------------------------------------
+ 
+-__fi u32* GET_VU_MEM(VURegs* VU, u32 addr)		// non-static, also used by sVU for now.
++__fi u32* GET_VU_MEM(VURegs* VU, u32 addr)
+ {
+-	if (VU == &vuRegs[1])
++	if (VU == &vuRegs[1]) {
++		Console.Warning("You need to use the VU1 interpreter!!!\n");
+ 		return (u32*)(vuRegs[1].Mem + (addr & 0x3fff));
+-	else if (addr & 0x4000)
++	} else if (addr & 0x4000)
++		return (u32*)((u8*)vuRegs[1].VF + (addr & 0x3ff)); // get VF and VI regs (they're mapped to 0x4xx0 in VU0 mem!)
++	else
++		return (u32*)(vuRegs[0].Mem + (addr & 0xfff)); // for addr 0x0000 to 0x4000 just wrap around
++}
++
++__fi u32* GET_VU_MEM(VURegs* VU, u32 addr, bool isWriting)		// non-static, also used by sVU for now.
++{
++	if (VU == &vuRegs[1]) {
++		if(isWriting) {
++			VUTracer::get().onMemoryWrite(addr, 0x10);
++		} else {
++			VUTracer::get().onMemoryRead(addr, 0x10);
++		}
++		return (u32*)(vuRegs[1].Mem + (addr & 0x3fff));
++	} else if (addr & 0x4000)
+ 		return (u32*)((u8*)vuRegs[1].VF + (addr & 0x3ff)); // get VF and VI regs (they're mapped to 0x4xx0 in VU0 mem!)
+ 	else
+ 		return (u32*)(vuRegs[0].Mem + (addr & 0xfff)); // for addr 0x0000 to 0x4000 just wrap around
+@@ -1654,7 +1670,7 @@ static __ri void _vuLQ(VURegs * VU) {
+ 	s16 imm = (VU->code & 0x400) ? (VU->code & 0x3ff) | 0xfc00 : (VU->code & 0x3ff);
+ 	u16 addr = ((imm + VU->VI[_Is_].SS[0]) * 16);
+ 
+- 	u32* ptr = (u32*)GET_VU_MEM(VU, addr);
++ 	u32* ptr = (u32*)GET_VU_MEM(VU, addr, false);
+ 	if (_X) VU->VF[_Ft_].UL[0] = ptr[0];
+ 	if (_Y) VU->VF[_Ft_].UL[1] = ptr[1];
+ 	if (_Z) VU->VF[_Ft_].UL[2] = ptr[2];
+@@ -1666,7 +1682,7 @@ static __ri void _vuLQD( VURegs * VU ) {
+ 	if (_Ft_ == 0) return;
+ 
+ 	u32 addr = (VU->VI[_Is_].US[0] * 16);
+-	u32* ptr = (u32*)GET_VU_MEM(VU, addr);
++	u32* ptr = (u32*)GET_VU_MEM(VU, addr, false);
+ 	if (_X) VU->VF[_Ft_].UL[0] = ptr[0];
+ 	if (_Y) VU->VF[_Ft_].UL[1] = ptr[1];
+ 	if (_Z) VU->VF[_Ft_].UL[2] = ptr[2];
+@@ -1676,7 +1692,7 @@ static __ri void _vuLQD( VURegs * VU ) {
+ static __ri void _vuLQI(VURegs * VU) {
+ 	if (_Ft_) {
+ 		u32 addr = (VU->VI[_Is_].US[0] * 16);
+-		u32* ptr = (u32*)GET_VU_MEM(VU, addr);
++		u32* ptr = (u32*)GET_VU_MEM(VU, addr, false);
+ 		if (_X) VU->VF[_Ft_].UL[0] = ptr[0];
+ 		if (_Y) VU->VF[_Ft_].UL[1] = ptr[1];
+ 		if (_Z) VU->VF[_Ft_].UL[2] = ptr[2];
+@@ -1689,7 +1705,7 @@ static __ri void _vuLQI(VURegs * VU) {
+ static __ri void _vuSQ(VURegs * VU) {
+ 	s16 imm = (VU->code & 0x400) ? (VU->code & 0x3ff) | 0xfc00 : (VU->code & 0x3ff);
+ 	u16 addr = ((imm + VU->VI[_It_].SS[0]) * 16);
+-	u32* ptr = (u32*)GET_VU_MEM(VU, addr);
++	u32* ptr = (u32*)GET_VU_MEM(VU, addr, true);
+ 	if (_X) ptr[0] = VU->VF[_Fs_].UL[0];
+ 	if (_Y) ptr[1] = VU->VF[_Fs_].UL[1];
+ 	if (_Z) ptr[2] = VU->VF[_Fs_].UL[2];
+@@ -1699,7 +1715,7 @@ static __ri void _vuSQ(VURegs * VU) {
+ static __ri void _vuSQD(VURegs * VU) {
+ 	if(_Ft_ != 0) VU->VI[_It_].US[0]--;
+ 	u32 addr = (VU->VI[_It_].US[0] * 16);
+-	u32* ptr = (u32*)GET_VU_MEM(VU, addr);
++	u32* ptr = (u32*)GET_VU_MEM(VU, addr, true);
+ 	if (_X) ptr[0] = VU->VF[_Fs_].UL[0];
+ 	if (_Y) ptr[1] = VU->VF[_Fs_].UL[1];
+ 	if (_Z) ptr[2] = VU->VF[_Fs_].UL[2];
+@@ -1708,7 +1724,7 @@ static __ri void _vuSQD(VURegs * VU) {
+ 
+ static __ri void _vuSQI(VURegs * VU) {
+ 	u32 addr = (VU->VI[_It_].US[0] * 16);
+-	u32* ptr = (u32*)GET_VU_MEM(VU, addr);
++	u32* ptr = (u32*)GET_VU_MEM(VU, addr, true);
+ 	if (_X) ptr[0] = VU->VF[_Fs_].UL[0];
+ 	if (_Y) ptr[1] = VU->VF[_Fs_].UL[1];
+ 	if (_Z) ptr[2] = VU->VF[_Fs_].UL[2];
+@@ -1722,7 +1738,7 @@ static __ri void _vuILW(VURegs * VU) {
+ 
+  	s16 imm = (VU->code & 0x400) ? (VU->code & 0x3ff) | 0xfc00 : (VU->code & 0x3ff);
+ 	u16 addr = ((imm + VU->VI[_Is_].SS[0]) * 16);
+-	u16* ptr = (u16*)GET_VU_MEM(VU, addr);
++	u16* ptr = (u16*)GET_VU_MEM(VU, addr, false);
+ 
+ #ifdef VI_BACKUP
+ 	VU->VIBackupCycles = 2;
+@@ -1739,7 +1755,7 @@ static __ri void _vuILW(VURegs * VU) {
+ static __fi void _vuISW(VURegs * VU) {
+  	s16 imm = (VU->code & 0x400) ? (VU->code & 0x3ff) | 0xfc00 : (VU->code & 0x3ff);
+ 	u16 addr = ((imm + VU->VI[_Is_].SS[0]) * 16);
+-	u16* ptr = (u16*)GET_VU_MEM(VU, addr);
++	u16* ptr = (u16*)GET_VU_MEM(VU, addr, true);
+ 	if (_X) { ptr[0] = VU->VI[_It_].US[0]; ptr[1] = 0; }
+ 	if (_Y) { ptr[2] = VU->VI[_It_].US[0]; ptr[3] = 0; }
+ 	if (_Z) { ptr[4] = VU->VI[_It_].US[0]; ptr[5] = 0; }
+@@ -1750,7 +1766,7 @@ static __ri void _vuILWR(VURegs * VU) {
+ 	if (_It_ == 0) return;
+ 
+ 	u32 addr = (VU->VI[_Is_].US[0] * 16);
+-	u16* ptr = (u16*)GET_VU_MEM(VU, addr);
++	u16* ptr = (u16*)GET_VU_MEM(VU, addr, false);
+ 
+ #ifdef VI_BACKUP
+ 	VU->VIBackupCycles = 2;
+@@ -1766,7 +1782,7 @@ static __ri void _vuILWR(VURegs * VU) {
+ 
+ static __ri void _vuISWR(VURegs * VU) {
+ 	u32 addr = (VU->VI[_Is_].US[0] * 16);
+-	u16* ptr = (u16*)GET_VU_MEM(VU, addr);
++	u16* ptr = (u16*)GET_VU_MEM(VU, addr, true);
+ 	if (_X) { ptr[0] = VU->VI[_It_].US[0]; ptr[1] = 0; }
+ 	if (_Y) { ptr[2] = VU->VI[_It_].US[0]; ptr[3] = 0; }
+ 	if (_Z) { ptr[4] = VU->VI[_It_].US[0]; ptr[5] = 0; }
+diff --git a/pcsx2/Vif.cpp b/pcsx2/Vif.cpp
+index c07ed1a0a..5ec1588dc 100644
+--- a/pcsx2/Vif.cpp
++++ b/pcsx2/Vif.cpp
+@@ -22,9 +22,147 @@
+ #include "Gif.h"
+ #include "MTVU.h"
+ #include "Gif_Unit.h"
++#include "DebugTools/Debug.h"
+ 
+ __aligned16 vifStruct  vif0, vif1;
+ 
++VUTracer::VUTracer() {}
++
++void VUTracer::onTraceMenuItemClicked() {
++	if(status == VUTRACESTATUS_DISABLED) {
++		status = VUTRACESTATUS_WAITING;
++	}
++}
++
++void VUTracer::onVif1DmaSendChain(u32 tadr) {
++	if(status == VUTRACESTATUS_WAITING) {
++		if(dma_waiting_chain_count < DMA_MAX_CHAINS_PER_FRAME) {
++			// Assume the chain with the lowest address is the first one.
++			// This should make the order of the traces consistent between runs.
++			dma_target_tadr = std::min(dma_target_tadr, tadr);
++			dma_waiting_chain_count++;
++		} else {
++			status = VUTRACESTATUS_TRACING;
++			beginTraceSession();
++		}
++	} else if(status == VUTRACESTATUS_TRACING) {
++		if(tadr == dma_target_tadr ||
++		   dma_tracing_chain_count >= DMA_MAX_CHAINS_PER_FRAME) {
++			status = VUTRACESTATUS_DISABLED;
++			dma_waiting_chain_count = 0;
++			dma_tracing_chain_count = 0;
++			dma_target_tadr = UINT32_MAX;
++			endTraceSession();
++		} else {
++			dma_tracing_chain_count++;
++		}
++	}
++}
++
++void VUTracer::onVifDmaTag(u32 madr, u64 dma_tag) {
++	if(status == VUTRACESTATUS_TRACING) {
++		fputc(VUTRACE_INDEX_DMATAG, index_file);
++		fwrite(&madr, sizeof(u32), 1, index_file);
++		fwrite(&dma_tag, sizeof(u64), 1, index_file);
++	}
++}
++
++void VUTracer::onVu1ExecMicro(u32 pc) {
++	if(status == VUTRACESTATUS_TRACING) {
++		endTrace();
++		beginTrace();
++	}
++}
++
++void VUTracer::onInstructionExecuted(VURegs* regs) {
++	if(status == VUTRACESTATUS_TRACING) {
++		pushLastPacket();
++		
++		if(!has_output_instructions) {
++			fputc(VUTRACE_SETINSTRUCTIONS, trace_file);
++			fwrite(regs->Micro, VU1_PROGSIZE, 1, trace_file);
++			has_output_instructions = true;
++		}
++		
++		fputc(VUTRACE_SETREGISTERS, trace_file);
++		fwrite((void*) regs, sizeof(VURegs), 1, trace_file);
++		fputc(VUTRACE_SETMEMORY, trace_file);
++		fwrite(regs->Mem, VU1_MEMSIZE, 1, trace_file);
++		
++		if(read_size > 0) {
++			fputc(VUTRACE_LOADOP, trace_file);
++			fwrite(&read_addr, sizeof(u32), 1, trace_file);
++			fwrite(&read_size, sizeof(u32), 1, trace_file);
++			read_size = 0;
++		}
++		
++		if(write_size > 0) {
++			fputc(VUTRACE_STOREOP, trace_file);
++			fwrite(&write_addr, sizeof(u32), 1, trace_file);
++			fwrite(&write_size, sizeof(u32), 1, trace_file);
++			write_size = 0;
++		}
++	}
++}
++
++void VUTracer::onMemoryRead(u32 addr, u32 size) {
++	read_addr = addr;
++	read_size = size;
++}
++
++void VUTracer::onMemoryWrite(u32 addr, u32 size) {
++	write_addr = addr;
++	write_size = size;
++}
++
++VUTracer& VUTracer::get() {
++	static VUTracer tracer;
++	return tracer;
++}
++
++void VUTracer::beginTraceSession() {
++	index_file = fopen("vutrace_output/_index.bin", "wb");
++	if(index_file == nullptr) {
++		printf("[VUTrace] Fatal error: Cannot open index file!\n");
++	}
++	
++	trace_index = -1;
++	beginTrace();
++}
++
++void VUTracer::endTraceSession() {
++	endTrace();
++	trace_index = -1;
++	fclose(index_file);
++}
++
++void VUTracer::beginTrace() {
++	int local_trace_index = trace_index++;
++	
++	fputc(VUTRACE_INDEX_TRACE, index_file);
++	fwrite(&local_trace_index, sizeof(int), 1, index_file);
++	
++	char file_name[128];
++	snprintf(file_name, 128, "vutrace_output/trace%d.bin", local_trace_index);
++	printf("[VUTrace] Tracing to %s\n", file_name);
++	trace_file = fopen(file_name, "wb");
++	if(trace_file == nullptr) {
++		printf("[VUTrace] Fatal error: Cannot open trace file!\n");
++	}
++}
++
++void VUTracer::endTrace() {
++	pushLastPacket();
++	fclose(trace_file);
++	has_output_instructions = false;
++}
++
++void VUTracer::pushLastPacket() {
++	if(ftell(trace_file) > 0) {
++		fputc(VUTRACE_PUSHSNAPSHOT, trace_file);
++	}
++}
++
+ void vif0Reset()
+ {
+ 	/* Reset the whole VIF, meaning the internal pcsx2 vars and all the registers */
+diff --git a/pcsx2/Vif.h b/pcsx2/Vif.h
+index 28a38716b..06200aa90 100644
+--- a/pcsx2/Vif.h
++++ b/pcsx2/Vif.h
+@@ -18,6 +18,69 @@
+ #include "MemoryTypes.h"
+ #include "R5900.h"
+ 
++#include <atomic>
++
++enum VUTracePacketType {
++	VUTRACE_PUSHSNAPSHOT = 'P', // Next packet directly follows.
++	VUTRACE_SETREGISTERS = 'R', // VURegs struct follows (32-bit pointers).
++	VUTRACE_SETMEMORY = 'M', // 16k memory follows.
++	VUTRACE_SETINSTRUCTIONS = 'I', // 16k micromem follows.
++	VUTRACE_LOADOP = 'L', // u32 address, u32 size follows.
++	VUTRACE_STOREOP = 'S' // u32 address, u32 size follows.
++};
++
++enum VUTraceIndexPacketType {
++	VUTRACE_INDEX_MICROPROGRAM = 'M', // u32 mpg_index follows.
++	VUTRACE_INDEX_TRACE = 'T', // u32 trace_index follows.
++	VUTRACE_INDEX_DMATAG = 'D', // u32 madr, u64 dma_tag follows.
++	VUTRACE_INDEX_VIFCODE = 'V' // u32 vif_code follows.
++};
++
++enum VUTraceStatus {
++	VUTRACESTATUS_DISABLED,
++	VUTRACESTATUS_WAITING, // We're waiting for a new VIF1 DMA chain to trace.
++	VUTRACESTATUS_TRACING
++};
++
++struct VURegs;
++class VUTracer {
++public:
++	VUTracer();
++	
++	void onTraceMenuItemClicked();
++	void onVif1DmaSendChain(u32 tadr);
++	void onVifDmaTag(u32 madr, u64 dma_tag);
++	void onVu1ExecMicro(u32 pc);
++	void onInstructionExecuted(VURegs* regs);
++	void onMemoryRead(u32 addr, u32 size);
++	void onMemoryWrite(u32 addr, u32 size);
++	
++	static VUTracer& get();
++	
++	std::atomic<int> trace_index { -1 };
++	
++private:
++	void beginTraceSession();
++	void endTraceSession();
++	void beginTrace();
++	void endTrace();
++	
++	void pushLastPacket();
++
++	VUTraceStatus status;
++	static const int DMA_MAX_CHAINS_PER_FRAME = 0x10;
++	u32 dma_waiting_chain_count = 0;
++	u32 dma_tracing_chain_count = 0;
++	u32 dma_target_tadr = UINT32_MAX;
++	
++	FILE* index_file = nullptr;
++	FILE* trace_file = nullptr;
++	bool has_output_instructions = false;
++	
++	u32 read_addr = 0, read_size = 0;
++	u32 write_addr = 0, write_size = 0;
++};
++
+ enum vif0_stat_flags
+ {
+ 	VIF0_STAT_VPS_W 	= (1),
+diff --git a/pcsx2/Vif1_Dma.cpp b/pcsx2/Vif1_Dma.cpp
+index 6fc6bca53..3b8620f27 100644
+--- a/pcsx2/Vif1_Dma.cpp
++++ b/pcsx2/Vif1_Dma.cpp
+@@ -160,7 +160,9 @@ __fi void vif1SetupTransfer()
+ 
+ 	VIF_LOG("VIF1 Tag %8.8x_%8.8x size=%d, id=%d, madr=%lx, tadr=%lx",
+ 			ptag[1]._u32, ptag[0]._u32, vif1ch.qwc, ptag->ID, vif1ch.madr, vif1ch.tadr);
+-
++	
++	VUTracer::get().onVifDmaTag(vif1ch.madr, *(u64*) &ptag);
++	
+ 	if (!vif1.done && ((dmacRegs.ctrl.STD == STD_VIF1) && (ptag->ID == TAG_REFS)))   // STD == VIF1
+ 	{
+ 		// there are still bugs, need to also check if gif->madr +16*qwc >= stadr, if not, stall
+@@ -471,6 +473,8 @@ void dmaVIF1()
+ 	}
+ 	else
+ 	{
++		VUTracer::get().onVif1DmaSendChain(vif1ch.tadr);
++		
+ 		if(vif1.irqoffset.enabled && !vif1.done) DevCon.Warning("Warning! VIF1 starting a new Chain transfer with vif offset set (Possible force stop?)");
+ 		vif1.dmamode = VIF_CHAIN_MODE;
+ 		vif1.done = false;
+diff --git a/pcsx2/gui/App.h b/pcsx2/gui/App.h
+index c167106a0..79c4f8e6c 100644
+--- a/pcsx2/gui/App.h
++++ b/pcsx2/gui/App.h
+@@ -178,6 +178,7 @@ enum MenuIdentifiers
+ 	MenuId_Debug_Open,			// opens the debugger window / starts a debug session
+ 	MenuId_Debug_MemoryDump,
+ 	MenuId_Debug_Logging,		// dialog for selection additional log options
++	MenuId_Debug_VUTrace,
+ 	MenuId_Debug_CreateBlockdump,
+ 	MenuId_Config_ResetAll,
+ 
+diff --git a/pcsx2/gui/MainFrame.cpp b/pcsx2/gui/MainFrame.cpp
+index f89a2e7b7..8c87b9f47 100644
+--- a/pcsx2/gui/MainFrame.cpp
++++ b/pcsx2/gui/MainFrame.cpp
+@@ -243,6 +243,7 @@ void MainEmuFrame::ConnectMenus()
+ 	// Debug
+ 	Bind(wxEVT_MENU, &MainEmuFrame::Menu_Debug_Open_Click, this, MenuId_Debug_Open);
+ 	Bind(wxEVT_MENU, &MainEmuFrame::Menu_Debug_Logging_Click, this, MenuId_Debug_Logging);
++	Bind(wxEVT_MENU, &MainEmuFrame::Menu_Debug_BeginVUTrace_Click, this, MenuId_Debug_VUTrace);
+ 
+ 	// Capture
+ 	Bind(wxEVT_MENU, &MainEmuFrame::Menu_Capture_Video_Record_Click, this, MenuId_Capture_Video_Record);
+@@ -554,6 +555,7 @@ MainEmuFrame::MainEmuFrame(wxWindow* parent, const wxString& title)
+ 	m_menuDebug.Append(MenuId_Debug_Logging,	_("&Logging..."),			wxEmptyString);
+ #endif
+ 	m_menuDebug.AppendCheckItem(MenuId_Debug_CreateBlockdump, _("Create &Blockdump"), _("Creates a block dump for debugging purposes."));
++	m_menuDebug.Append(MenuId_Debug_VUTrace,		_("Begin &VU trace..."),	wxEmptyString);
+ 
+ 	// ------------------------------------------------------------------------
+ 
+diff --git a/pcsx2/gui/MainFrame.h b/pcsx2/gui/MainFrame.h
+index 557058624..a77d2bcbe 100644
+--- a/pcsx2/gui/MainFrame.h
++++ b/pcsx2/gui/MainFrame.h
+@@ -208,6 +208,7 @@ protected:
+ 	void Menu_Debug_MemoryDump_Click(wxCommandEvent &event);
+ 	void Menu_Debug_Logging_Click(wxCommandEvent &event);
+ 	void Menu_Debug_CreateBlockdump_Click(wxCommandEvent &event);
++	void Menu_Debug_BeginVUTrace_Click(wxCommandEvent &event);
+ 	void Menu_Ask_On_Boot_Click(wxCommandEvent &event);
+ 
+ 	void Menu_ShowConsole(wxCommandEvent &event);
+diff --git a/pcsx2/gui/MainMenuClicks.cpp b/pcsx2/gui/MainMenuClicks.cpp
+index e8161a666..7a1f44b6b 100644
+--- a/pcsx2/gui/MainMenuClicks.cpp
++++ b/pcsx2/gui/MainMenuClicks.cpp
+@@ -687,6 +687,13 @@ void MainEmuFrame::Menu_Debug_Logging_Click(wxCommandEvent &event)
+ 	AppOpenDialog<LogOptionsDialog>( this );
+ }
+ 
++#include "Vif.h"
++
++void MainEmuFrame::Menu_Debug_BeginVUTrace_Click(wxCommandEvent &event)
++{
++	VUTracer::get().onTraceMenuItemClicked();
++}
++
+ void MainEmuFrame::Menu_ShowConsole(wxCommandEvent &event)
+ {
+ 	// Use messages to relay open/close commands (thread-safe)
+diff --git a/plugins/GSdx/GS.cpp b/plugins/GSdx/GS.cpp
+index 8c6387aee..4f41ff418 100644
+--- a/plugins/GSdx/GS.cpp
++++ b/plugins/GSdx/GS.cpp
+@@ -1606,4 +1606,11 @@ EXPORT_C GSReplay(char* lpszCmdLine, int renderer)
+ 	GSclose();
+ 	GSshutdown();
+ }
++
++EXPORT_C GSvutraceSetTraceIndex(int index)
++{
++	VUTraceGSSideData::get().vutrace_trace_index = index;
++	VUTraceGSSideData::get().vutrace_backbuffer_index = 0;
++}
++
+ #endif
+diff --git a/plugins/GSdx/GSPng.cpp b/plugins/GSdx/GSPng.cpp
+index 47f401974..8c5878501 100644
+--- a/plugins/GSdx/GSPng.cpp
++++ b/plugins/GSdx/GSPng.cpp
+@@ -121,7 +121,7 @@ namespace GSPng {
+             return false;
+ 
+         // Second image
+-        if (pixel[fmt].extension[1] == nullptr)
++        //if (pixel[fmt].extension[1] == nullptr)
+             return true;
+ 
+         filename = root + pixel[fmt].extension[1];
+diff --git a/plugins/GSdx/GSdx.def b/plugins/GSdx/GSdx.def
+index 152e77a7a..9447ab40e 100644
+--- a/plugins/GSdx/GSdx.def
++++ b/plugins/GSdx/GSdx.def
+@@ -43,6 +43,7 @@ EXPORTS
+ 	GSReplay
+ 	GSBenchmark
+ 	GSgetTitleInfo2
++	GSvutraceSetTraceIndex
+ 	PSEgetLibType
+ 	PSEgetLibName
+ 	PSEgetLibVersion
+diff --git a/plugins/GSdx/Renderers/SW/GSRendererSW.cpp b/plugins/GSdx/Renderers/SW/GSRendererSW.cpp
+index 6a29eef53..8e2d02e72 100644
+--- a/plugins/GSdx/Renderers/SW/GSRendererSW.cpp
++++ b/plugins/GSdx/Renderers/SW/GSRendererSW.cpp
+@@ -564,6 +564,14 @@ void GSRendererSW::Draw()
+ 		Queue(data);
+ 	}
+ 
++	VUTraceGSSideData& vutrace = VUTraceGSSideData::get();
++	if(vutrace.vutrace_trace_index != -1)
++	{
++		std::string s = format("vutrace_output/trace%d_buffer%d.bmp", vutrace.vutrace_trace_index, vutrace.vutrace_backbuffer_index++);
++		printf("[VUTrace] Dumping framebuffer: %s\n", s.c_str());
++		m_mem.SaveBMP(s, m_context->FRAME.Block(), m_context->FRAME.FBW, m_context->FRAME.PSM, GetFrameRect().width(), 512);
++	}
++
+ 	/*
+ 	if(0)//stats.ticks > 5000000)
+ 	{
+diff --git a/plugins/GSdx/Renderers/SW/GSRendererSW.h b/plugins/GSdx/Renderers/SW/GSRendererSW.h
+index dfa73e0c2..bc7107cdd 100644
+--- a/plugins/GSdx/Renderers/SW/GSRendererSW.h
++++ b/plugins/GSdx/Renderers/SW/GSRendererSW.h
+@@ -24,6 +24,16 @@
+ #include "Renderers/SW/GSTextureCacheSW.h"
+ #include "Renderers/SW/GSDrawScanline.h"
+ 
++struct VUTraceGSSideData {
++	int vutrace_trace_index = -1;
++	int vutrace_backbuffer_index = 0;
++	
++	static VUTraceGSSideData& get() {
++		static VUTraceGSSideData instance;
++		return instance;
++	}
++};
++
+ class GSRendererSW : public GSRenderer
+ {
+ 	static GSVector4 m_pos_scale;

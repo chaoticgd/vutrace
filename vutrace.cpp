@@ -85,7 +85,8 @@ void registers_window(AppState &app);
 void memory_window(AppState &app);
 void disassembly_window(AppState &app);
 void gs_packet_window(AppState &app);
-bool walk_until_pc_equal(AppState &app, u32 target_pc, int step); // Add step to the current snapshot index until pc == target_pc. If not found return false.
+bool walk_until_pc_equal(AppState &app, u32 target_pc, int step); // Add step to the current snapshot index until pc == target_pc, otherwise do nothing.
+void walk_until_mem_access(AppState &app, u32 address); // Add 1 to the current snapshot index until a snapshot reads from/writes to address, otherwise do nothing.
 void parse_trace(AppState &app, std::string trace_file_path);
 void parse_comment_file(AppState &app, std::string comment_file_path);
 void save_comment_file(AppState &app);
@@ -342,35 +343,64 @@ void memory_window(AppState &app)
 	static const int ROW_SIZE = 32;
 	
 	ImGui::BeginChild("rows_outer");
-	if(ImGui::BeginChild("rows", ImVec2(0, (VU1_MEMSIZE / ROW_SIZE) * 18))) {
+	if(ImGui::BeginChild("rows")) {
 		ImDrawList *dl = ImGui::GetWindowDrawList();
 		
+		ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.f, 0.f, 0.f, 0.f));
+		ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(0, 0));
+		ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(18, 4));
+		
 		for(int i = 0; i < VU1_MEMSIZE / ROW_SIZE; i++) {
-			float pos_y = ImGui::GetItemRectMin().y + i * 18.f;
+			ImGui::PushID(i);
 			
 			static ImColor row_header_col = ImColor(1.f, 1.f, 1.f);
 			std::stringstream row_header;
 			row_header << std::hex << std::setfill('0') << std::setw(5) << i * ROW_SIZE;
-			dl->AddText(ImVec2(ImGui::GetItemRectMin().x + 8, pos_y), row_header_col, row_header.str().c_str());
+			ImGui::Text("%s", row_header.str().c_str());
+			ImGui::SameLine();
 			
-			u8 *data = current.memory + i * ROW_SIZE;
-			u8 *last_data = last->memory + i * ROW_SIZE;
-			for(int j = 0; j < ROW_SIZE; j++) {
-				int val = data[j];
-				std::stringstream hex;
-				if(val < 0x10) hex << "0";
-				hex << std::hex << val;
-				
-				ImVec2 hex_pos {
-					56 + ImGui::GetItemRectMin().x + (j * 5) / 4 * 18.f, pos_y
+			for(int j = 0; j < ROW_SIZE / 4; j++) {
+				ImGui::PushID(j);
+				const auto draw_byte = [&](int k) {
+					ImGui::PushID(k);
+					
+					u32 address = i * ROW_SIZE + j * 4 + k;
+					u32 val = current.memory[address];
+					u32 last_val = last->memory[address];
+					std::stringstream hex;
+					if(val < 0x10) hex << "0";
+					hex << std::hex << val;
+					ImVec4 hex_col = ImVec4(0.8f, 0.8f, 0.8f, 1.f);
+					if(val != last_val) {
+						hex_col = ImVec4(1.f, 0.5f, 0.5f, 1.f);
+					}
+					ImGui::PushStyleColor(ImGuiCol_Text, hex_col);
+					if(ImGui::Button(hex.str().c_str())) {
+						walk_until_mem_access(app, address);
+					}
+					ImGui::SameLine();
+					ImGui::PopStyleColor();
+					
+					ImGui::PopID(); //k
 				};
-				ImColor hex_col = ImColor(0.8f, 0.8f, 0.8f);
-				if(val != last_data[j]) {
-					hex_col = ImColor(1.f, 0.5f, 0.5f);
-				}
-				dl->AddText(hex_pos, hex_col, hex.str().c_str());
+				
+				ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(6, 4));
+				draw_byte(0);
+				draw_byte(1);
+				draw_byte(2);
+				ImGui::PopStyleVar();
+				draw_byte(3);
+				ImGui::PopID(); // j
 			}
+			ImGui::NewLine();
+			
+			ImGui::PopID(); // i
 		}
+		
+		ImGui::PopStyleColor();
+		ImGui::PopStyleVar();
+		ImGui::PopStyleVar();
+		
 		ImGui::EndChild();
 	}
 	ImGui::EndChild();
@@ -610,6 +640,25 @@ bool walk_until_pc_equal(AppState &app, u32 target_pc, int step)
 	app.current_snapshot = snapshot;
 	app.snapshots_scroll_to = true;
 	return true;
+}
+
+void walk_until_mem_access(AppState &app, u32 address)
+{
+	std::size_t snapshot_index = app.current_snapshot;
+	do {
+		snapshot_index = (snapshot_index + 1) % app.snapshots.size();
+		
+		Snapshot &snap = app.snapshots[snapshot_index];
+		if((snap.read_size > 0 && (snap.read_addr / 0x10 == address / 0x10)) ||
+		   (snap.write_size > 0 && (snap.write_addr / 0x10 == address / 0x10))) {
+			if(snapshot_index >= 1) {
+				app.current_snapshot = snapshot_index - 1;
+				app.snapshots_scroll_to = true;
+				app.disassembly_scroll_to = true;
+			}
+			return;
+		}
+	} while(snapshot_index != app.current_snapshot);
 }
 
 enum VUTracePacketType {

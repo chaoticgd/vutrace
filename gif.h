@@ -116,6 +116,12 @@ struct GsPackedData
 			GsRegister addr;
 			uint64_t data;
 		} ad;
+		struct {
+			s16 x, y;
+			u32 z;
+			u8 f;
+			bool adc;
+		} xyzf2;
 	};
 };
 
@@ -226,6 +232,13 @@ void interpret_packed_data(GsPackedData &item)
 			item.ad.addr = (GsRegister) bit_range(hi, 0, 3);
 			item.ad.data = lo;
 			break;
+		}
+		case GSREG_XYZF2: {
+			item.xyzf2.x = bit_range(lo, 0, 15);
+			item.xyzf2.y = bit_range(lo, 32, 47);
+			item.xyzf2.z = bit_range(hi, 4, 27);
+			item.xyzf2.f = bit_range(hi, 36, 43);
+			item.xyzf2.adc = bit_range(hi, 47, 47);
 		}
 	}
 }

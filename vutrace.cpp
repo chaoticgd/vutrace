@@ -611,6 +611,11 @@ void gs_packet_window(AppState &app)
 				ImGui::Text("%s <- %lx\n", gs_register_name(item.ad.addr), item.ad.data);
 				break;
 			}
+			case GSREG_XYZF2: {
+				ImGui::Text("%d %d %d F=%d ADC=%d",
+					item.xyzf2.x, item.xyzf2.y, item.xyzf2.z, item.xyzf2.f, item.xyzf2.adc);
+				break;
+			}
 			default: {
 				// Hex dump the raw data.
 				for(std::size_t i = 0; i < 0x10; i += 4) {

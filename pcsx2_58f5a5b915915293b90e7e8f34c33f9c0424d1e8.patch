@@ -10,6 +10,31 @@ index 8fa7245da..a11f45651 100644
  
  // PAD
  typedef s32(CALLBACK *_PADinit)(u32 flags);
+diff --git a/pcsx2/DebugTools/Debug.h b/pcsx2/DebugTools/Debug.h
+index 6dfece3e7..0ef391d70 100644
+--- a/pcsx2/DebugTools/Debug.h
++++ b/pcsx2/DebugTools/Debug.h
+@@ -372,6 +372,20 @@ extern void __Log( const char* fmt, ... );
+ #define VifCodeLog		macTrace(EE.VIFcode)
+ #define GifTagLog		macTrace(EE.GIFtag)
+ 
++void vutrace_log(const char* prefix, const char* fmt, ...);
++
++#undef DMA_LOG
++#define DMA_LOG(...) \
++	macTrace(EE.DMAhw)(__VA_ARGS__); \
++	vutrace_log("[DMA] ", __VA_ARGS__)
++#undef VIF_LOG
++#define VIF_LOG(...) \
++	macTrace(EE.VIF)(__VA_ARGS__); \
++	vutrace_log("[VIF] ", __VA_ARGS__)
++#undef VifCodeLog
++#define VifCodeLog(...) \
++	macTrace(EE.VIFcode)(__VA_ARGS__); \
++	vutrace_log("[VifCode] ", __VA_ARGS__)
+ 
+ #define PSXBIOS_LOG		macTrace(IOP.Bios)
+ #define PSXCPU_LOG		macTrace(IOP.R3000A)
 diff --git a/pcsx2/MTGS.cpp b/pcsx2/MTGS.cpp
 index 1c4a0ee2d..26c9f83a4 100644
 --- a/pcsx2/MTGS.cpp
@@ -216,10 +241,10 @@ index bdac36485..851705d90 100644
  	if (_Y) { ptr[2] = VU->VI[_It_].US[0]; ptr[3] = 0; }
  	if (_Z) { ptr[4] = VU->VI[_It_].US[0]; ptr[5] = 0; }
 diff --git a/pcsx2/Vif.cpp b/pcsx2/Vif.cpp
-index c07ed1a0a..5ec1588dc 100644
+index c07ed1a0a..851e94a9a 100644
 --- a/pcsx2/Vif.cpp
 +++ b/pcsx2/Vif.cpp
-@@ -22,9 +22,147 @@
+@@ -22,9 +22,156 @@
  #include "Gif.h"
  #include "MTVU.h"
  #include "Gif_Unit.h"
@@ -261,11 +286,7 @@ index c07ed1a0a..5ec1588dc 100644
 +}
 +
 +void VUTracer::onVifDmaTag(u32 madr, u64 dma_tag) {
-+	if(status == VUTRACESTATUS_TRACING) {
-+		fputc(VUTRACE_INDEX_DMATAG, index_file);
-+		fwrite(&madr, sizeof(u32), 1, index_file);
-+		fwrite(&dma_tag, sizeof(u64), 1, index_file);
-+	}
++	
 +}
 +
 +void VUTracer::onVu1ExecMicro(u32 pc) {
@@ -316,15 +337,29 @@ index c07ed1a0a..5ec1588dc 100644
 +	write_size = size;
 +}
 +
++void vutrace_log(const char* prefix, const char* fmt, ...) {
++	FILE* log_file = VUTracer::get().log_file;
++	if(log_file == nullptr) {
++		return;
++	}
++	
++	va_list args;
++	va_start(args, fmt);
++	fputs(prefix, log_file);
++	vfprintf(log_file, fmt, args);
++	fputc('\n', log_file);
++	va_end(args);
++}
++
 +VUTracer& VUTracer::get() {
 +	static VUTracer tracer;
 +	return tracer;
 +}
 +
 +void VUTracer::beginTraceSession() {
-+	index_file = fopen("vutrace_output/_index.bin", "wb");
-+	if(index_file == nullptr) {
-+		printf("[VUTrace] Fatal error: Cannot open index file!\n");
++	log_file = fopen("vutrace_output/_log.txt", "wb");
++	if(log_file == nullptr) {
++		printf("[VUTrace] Fatal error: Cannot open log file!\n");
 +	}
 +	
 +	trace_index = -1;
@@ -334,18 +369,17 @@ index c07ed1a0a..5ec1588dc 100644
 +void VUTracer::endTraceSession() {
 +	endTrace();
 +	trace_index = -1;
-+	fclose(index_file);
++	fclose(log_file);
++	log_file = nullptr;
 +}
 +
 +void VUTracer::beginTrace() {
 +	int local_trace_index = trace_index++;
 +	
-+	fputc(VUTRACE_INDEX_TRACE, index_file);
-+	fwrite(&local_trace_index, sizeof(int), 1, index_file);
-+	
 +	char file_name[128];
 +	snprintf(file_name, 128, "vutrace_output/trace%d.bin", local_trace_index);
 +	printf("[VUTrace] Tracing to %s\n", file_name);
++	fprintf(log_file, "[VUTrace] Tracing to %s\n", file_name);
 +	trace_file = fopen(file_name, "wb");
 +	if(trace_file == nullptr) {
 +		printf("[VUTrace] Fatal error: Cannot open trace file!\n");
@@ -368,10 +402,10 @@ index c07ed1a0a..5ec1588dc 100644
  {
  	/* Reset the whole VIF, meaning the internal pcsx2 vars and all the registers */
 diff --git a/pcsx2/Vif.h b/pcsx2/Vif.h
-index 28a38716b..06200aa90 100644
+index 28a38716b..8c0d591a5 100644
 --- a/pcsx2/Vif.h
 +++ b/pcsx2/Vif.h
-@@ -18,6 +18,69 @@
+@@ -18,6 +18,61 @@
  #include "MemoryTypes.h"
  #include "R5900.h"
  
@@ -384,13 +418,6 @@ index 28a38716b..06200aa90 100644
 +	VUTRACE_SETINSTRUCTIONS = 'I', // 16k micromem follows.
 +	VUTRACE_LOADOP = 'L', // u32 address, u32 size follows.
 +	VUTRACE_STOREOP = 'S' // u32 address, u32 size follows.
-+};
-+
-+enum VUTraceIndexPacketType {
-+	VUTRACE_INDEX_MICROPROGRAM = 'M', // u32 mpg_index follows.
-+	VUTRACE_INDEX_TRACE = 'T', // u32 trace_index follows.
-+	VUTRACE_INDEX_DMATAG = 'D', // u32 madr, u64 dma_tag follows.
-+	VUTRACE_INDEX_VIFCODE = 'V' // u32 vif_code follows.
 +};
 +
 +enum VUTraceStatus {
@@ -415,7 +442,7 @@ index 28a38716b..06200aa90 100644
 +	static VUTracer& get();
 +	
 +	std::atomic<int> trace_index { -1 };
-+	
++	FILE* log_file = nullptr;
 +private:
 +	void beginTraceSession();
 +	void endTraceSession();
@@ -430,7 +457,6 @@ index 28a38716b..06200aa90 100644
 +	u32 dma_tracing_chain_count = 0;
 +	u32 dma_target_tadr = UINT32_MAX;
 +	
-+	FILE* index_file = nullptr;
 +	FILE* trace_file = nullptr;
 +	bool has_output_instructions = false;
 +	
@@ -465,6 +491,23 @@ index 6fc6bca53..3b8620f27 100644
  		if(vif1.irqoffset.enabled && !vif1.done) DevCon.Warning("Warning! VIF1 starting a new Chain transfer with vif offset set (Possible force stop?)");
  		vif1.dmamode = VIF_CHAIN_MODE;
  		vif1.done = false;
+diff --git a/pcsx2/Vif_Transfer.cpp b/pcsx2/Vif_Transfer.cpp
+index bf26d5c6f..23603f58a 100644
+--- a/pcsx2/Vif_Transfer.cpp
++++ b/pcsx2/Vif_Transfer.cpp
+@@ -50,10 +50,10 @@ _vifT void vifTransferLoop(u32* &data) {
+ 			
+ 			
+ 			//VIF_LOG("New VifCMD %x tagsize %x", vifX.cmd, vifX.tag.size);
+-			if (IsDevBuild && SysTrace.EE.VIFcode.IsActive()) {
++			//if (IsDevBuild && SysTrace.EE.VIFcode.IsActive()) {
+ 				// Pass 2 means "log it"
+ 				vifCmdHandler[idx][vifX.cmd & 0x7f](2, data);
+-			}
++			//}
+ 		}
+ 
+ 		ret = vifCmdHandler[idx][vifX.cmd & 0x7f](vifX.pass, data);
 diff --git a/pcsx2/gui/App.h b/pcsx2/gui/App.h
 index c167106a0..79c4f8e6c 100644
 --- a/pcsx2/gui/App.h

@@ -241,7 +241,7 @@ index bdac36485..851705d90 100644
  	if (_Y) { ptr[2] = VU->VI[_It_].US[0]; ptr[3] = 0; }
  	if (_Z) { ptr[4] = VU->VI[_It_].US[0]; ptr[5] = 0; }
 diff --git a/pcsx2/Vif.cpp b/pcsx2/Vif.cpp
-index c07ed1a0a..851e94a9a 100644
+index c07ed1a0a..919828346 100644
 --- a/pcsx2/Vif.cpp
 +++ b/pcsx2/Vif.cpp
 @@ -22,9 +22,156 @@
@@ -379,7 +379,7 @@ index c07ed1a0a..851e94a9a 100644
 +	char file_name[128];
 +	snprintf(file_name, 128, "vutrace_output/trace%d.bin", local_trace_index);
 +	printf("[VUTrace] Tracing to %s\n", file_name);
-+	fprintf(log_file, "[VUTrace] Tracing to %s\n", file_name);
++	fprintf(log_file, "[VUTrace] ******************************** Tracing to %s ********************************\n", file_name);
 +	trace_file = fopen(file_name, "wb");
 +	if(trace_file == nullptr) {
 +		printf("[VUTrace] Fatal error: Cannot open trace file!\n");

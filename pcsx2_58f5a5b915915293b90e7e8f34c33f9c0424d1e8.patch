@@ -241,7 +241,7 @@ index bdac36485..851705d90 100644
  	if (_Y) { ptr[2] = VU->VI[_It_].US[0]; ptr[3] = 0; }
  	if (_Z) { ptr[4] = VU->VI[_It_].US[0]; ptr[5] = 0; }
 diff --git a/pcsx2/Vif.cpp b/pcsx2/Vif.cpp
-index c07ed1a0a..919828346 100644
+index c07ed1a0a..6f07fe490 100644
 --- a/pcsx2/Vif.cpp
 +++ b/pcsx2/Vif.cpp
 @@ -22,9 +22,156 @@
@@ -377,7 +377,7 @@ index c07ed1a0a..919828346 100644
 +	int local_trace_index = trace_index++;
 +	
 +	char file_name[128];
-+	snprintf(file_name, 128, "vutrace_output/trace%d.bin", local_trace_index);
++	snprintf(file_name, 128, "vutrace_output/trace%06d.bin", local_trace_index);
 +	printf("[VUTrace] Tracing to %s\n", file_name);
 +	fprintf(log_file, "[VUTrace] ******************************** Tracing to %s ********************************\n", file_name);
 +	trace_file = fopen(file_name, "wb");
@@ -612,7 +612,7 @@ index 152e77a7a..9447ab40e 100644
  	PSEgetLibName
  	PSEgetLibVersion
 diff --git a/plugins/GSdx/Renderers/SW/GSRendererSW.cpp b/plugins/GSdx/Renderers/SW/GSRendererSW.cpp
-index 6a29eef53..8e2d02e72 100644
+index 6a29eef53..23ed9b26b 100644
 --- a/plugins/GSdx/Renderers/SW/GSRendererSW.cpp
 +++ b/plugins/GSdx/Renderers/SW/GSRendererSW.cpp
 @@ -564,6 +564,14 @@ void GSRendererSW::Draw()
@@ -622,7 +622,7 @@ index 6a29eef53..8e2d02e72 100644
 +	VUTraceGSSideData& vutrace = VUTraceGSSideData::get();
 +	if(vutrace.vutrace_trace_index != -1)
 +	{
-+		std::string s = format("vutrace_output/trace%d_buffer%d.bmp", vutrace.vutrace_trace_index, vutrace.vutrace_backbuffer_index++);
++		std::string s = format("vutrace_output/trace%06d_buffer%d.bmp", vutrace.vutrace_trace_index, vutrace.vutrace_backbuffer_index++);
 +		printf("[VUTrace] Dumping framebuffer: %s\n", s.c_str());
 +		m_mem.SaveBMP(s, m_context->FRAME.Block(), m_context->FRAME.FBW, m_context->FRAME.PSM, GetFrameRect().width(), 512);
 +	}

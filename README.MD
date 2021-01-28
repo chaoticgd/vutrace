@@ -4,6 +4,10 @@ A tracing debugger for the PS2's second vector processing unit (VPU1). A modifie
 
 It works on Linux. It might work on Windows but I haven't tested it.
 
+## Screenshot
+
+![Screenshot](screenshot.png)
+
 ## Usage
 
 1. Checkout PCSX2 commit `58f5a5b915915293b90e7e8f34c33f9c0424d1e8` and apply the patch `pcsx2_58f5a5b915915293b90e7e8f34c33f9c0424d1e8.patch` to it using `git apply`, then build PCSX2.

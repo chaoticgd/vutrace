@@ -24,6 +24,13 @@ It works on Linux. It might work on Windows but I haven't tested it.
 
 7. Open a trace: `./vutrace (PCSX2 working dir)/vutrace_output/traceN.bin` where N is the index of the trace.
 
+## Keyboard Controls
+
+- W - Step back one instruction.
+- S - Step forward one instruction.
+- A - Step back one loop iteration (until the PC is the same as it was originally).
+- D - Step forward one loop iteration (until the PC is the same as it was originally).
+
 ## Known Issues
 
 - vutrace: The GS packet parser assumes that the data transfer to the GS is instant.

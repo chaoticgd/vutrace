@@ -23,3 +23,10 @@ It works on Linux. It might work on Windows but I haven't tested it.
 6. Trace a frame using `Begin VU trace...` (warning: traces may be very large).
 
 7. Open a trace: `./vutrace (PCSX2 working dir)/vutrace_output/traceN.bin` where N is the index of the trace.
+
+## Known Issues
+
+- vutrace: The GS packet parser assumes that the data transfer to the GS is instant.
+- patch: The version of PCSX2 that is supported is a bit out of date.
+- patch: Traces don't start and end on vsync so it doesn't always trace an entire frame.
+- patch: The framebuffer dumps aren't synced with the VU state dumps.

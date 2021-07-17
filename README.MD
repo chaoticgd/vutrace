@@ -8,7 +8,7 @@ It works on Linux. It might work on Windows but I haven't tested it.
 
 ![Screenshot](screenshot.png)
 
-## Usage
+## vutrace Usage
 
 1. Checkout PCSX2 commit `58f5a5b915915293b90e7e8f34c33f9c0424d1e8` and apply the patch `pcsx2_58f5a5b915915293b90e7e8f34c33f9c0424d1e8.patch` to it using `git apply`, then build PCSX2.
 
@@ -23,6 +23,16 @@ It works on Linux. It might work on Windows but I haven't tested it.
 6. Trace a frame using `Begin VU trace...` (warning: traces may be very large).
 
 7. Open a trace: `./vutrace (PCSX2 working dir)/vutrace_output/traceN.bin` where N is the index of the trace.
+
+## vudis Usage
+
+This is the disassembler split out into a seperate component.
+
+1. Build vutrace using cmake: `cmake . && cmake --build .`.
+
+2. Open a memory dump: `./vudis vu0MicroMem.bin`.
+
+where vu0MicroMem.bin or vu1MicroMem.bin can be extracted from the PCSX2 save state.
 
 ## Keyboard Controls
 

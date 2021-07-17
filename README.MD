@@ -32,7 +32,7 @@ This is the disassembler split out into a seperate component.
 
 2. Open a memory dump: `./vudis vu0MicroMem.bin`.
 
-where vu0MicroMem.bin or vu1MicroMem.bin can be extracted from the PCSX2 save state.
+where `vu0MicroMem.bin` or `vu1MicroMem.bin` can be extracted from a PCSX2 save state.
 
 ## Keyboard Controls
 

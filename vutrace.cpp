@@ -340,6 +340,18 @@ void memory_window(AppState &app)
 		}
 	}
 	
+	ImGui::SameLine();
+	static MessageBoxState save_to_file;
+	if(prompt(save_to_file, "Save to File")) {
+		FILE* dump_file = fopen(save_to_file.text.c_str(), "wb");
+		if(dump_file) {
+			fwrite(&current.memory[0], sizeof(current.memory), 1, dump_file);
+			fclose(dump_file);
+		} else {
+			fprintf(stderr, "Failed to open %s for writing.\n", save_to_file.text.c_str());
+		}
+	}
+	
 	static const int ROW_SIZE = 32;
 	
 	ImGui::BeginChild("rows_outer");

@@ -176,8 +176,8 @@ GsPacket read_gs_packet(u8 *data, int size)
 						return packet;
 					}
 					memcpy(item.buffer, &data[pos], 0x10);
-					pos += 0x10;
 					item.source_address = VU1_MEMSIZE - size + pos;
+					pos += 0x10;
 					item.reg = prim.tag.regs[j];
 					interpret_packed_data(item);
 					prim.packed_data.push_back(item);

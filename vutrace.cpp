@@ -295,6 +295,13 @@ void registers_window(AppState &app)
 					i, value.F[0], value.F[1], value.F[2], value.F[3]);
 			}
 		}
+		if(show_as_hex) {
+			ImGui::Text("ACC = %08x %08x %08x %08x",
+				regs.ACC.F[0], regs.ACC.F[1], regs.ACC.F[2], regs.ACC.F[3]);
+		} else {
+			ImGui::Text("ACC = %.4f %.4f %.4f %.4f",
+				regs.ACC.F[0], regs.ACC.F[1], regs.ACC.F[2], regs.ACC.F[3]);
+		}
 	ImGui::NextColumn();
 	ImGui::SetColumnWidth(1, 192);
 	ImGui::SetColumnOffset(1, ImGui::GetWindowSize().x - 192);

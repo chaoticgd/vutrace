@@ -103,8 +103,8 @@ size_t from_hex(const std::string& in);
 
 int main(int argc, char **argv)
 {
-	if(argc != 2) {
-		fprintf(stderr, "You must specify a trace file.\n");
+	if(argc != 2 && argc != 3) {
+		fprintf(stderr, "usage: %s <trace file> [comment file]\n", argv[0]);
 		return 1;
 	}
 	
@@ -114,6 +114,10 @@ int main(int argc, char **argv)
 	
 	AppState app;
 	parse_trace(app, argv[1]);
+	
+	if(argc == 3) {
+		parse_comment_file(app, argv[2]);
+	}
 	
 	ImGuiContext &g = *GImGui;
 

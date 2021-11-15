@@ -476,9 +476,9 @@ void disassembly_window(AppState &app)
 		if(instruction.branch_from_times.size() > 0) {
 			std::stringstream addresses;
 			std::size_t fallthrough_times = app.instructions[i / 8 + 1].times_executed;
-			for(auto &[addr, times] : instruction.branch_from_times) {
-				addresses << std::hex << addr << " (" << std::dec << times << ") ";
-				fallthrough_times -= times;
+			for(auto addrtimes = instruction.branch_from_times.begin(); addrtimes != instruction.branch_from_times.end(); addrtimes++) {
+				addresses << std::hex << addrtimes->first << " (" << std::dec << addrtimes->second << ") ";
+				fallthrough_times -= addrtimes->second;
 			} 
 			ImGui::Text("  %s/ ft (%ld) ->", addresses.str().c_str(), fallthrough_times);
 		}
@@ -498,9 +498,9 @@ void disassembly_window(AppState &app)
 		if(instruction.branch_to_times.size() > 0) {
 			std::stringstream addresses;
 			std::size_t fallthrough_times = instruction.times_executed;
-			for(auto &[addr, times] : instruction.branch_to_times) {
-				addresses << std::hex << addr << " (" << std::dec << times << ") ";
-				fallthrough_times -= times;
+			for(auto addrtimes = instruction.branch_to_times.begin(); addrtimes != instruction.branch_to_times.end(); addrtimes++) {
+				addresses << std::hex << addrtimes->first << " (" << std::dec << addrtimes->second << ") ";
+				fallthrough_times -= addrtimes->second;
 			} 
 			ImGui::Text("  -> %s/ ft (%ld)", addresses.str().c_str(), fallthrough_times);
 		}

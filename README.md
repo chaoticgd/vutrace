@@ -2,7 +2,7 @@
 
 A tracing debugger for the PS2's second vector processing unit (VPU1). A modified version of PCSX2 can be used to dump out the state of VU1 after each instruction is executed, and the resultant traces can be viewed with the main vutrace application.
 
-It works on Linux. It might work on Windows but I haven't tested it.
+It should build on Linux (GCC) or Windows (MSVC) but has mainly been tested on Linux.
 
 ## Screenshot
 

@@ -64,7 +64,7 @@ std::string disassemble(u8 *instruction, u32 address)
 #define mVUlog( ...) \
 	char buffer[1024]; \
 	memset(buffer, 0, 1024); \
-	sprintf(buffer, __VA_ARGS__); \
+	snprintf(buffer, 1024, __VA_ARGS__); \
 	result += std::string(buffer);
 
 void mVUunknown(std::string &result, uint32_t insn, uint32_t pc)

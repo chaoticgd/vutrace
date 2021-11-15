@@ -19,10 +19,6 @@
 
 #include <stdint.h>
 
-static const uint VU1_MEMSIZE	= 0x4000;		// 16kb
-static const uint VU1_PROGSIZE	= 0x4000;		// 16kb
-static const uint TPC = 26;
-
 typedef int64_t s64;
 typedef uint64_t u64;
 typedef int32_t s32;
@@ -32,6 +28,10 @@ typedef uint16_t u16;
 typedef int8_t s8;
 typedef uint8_t u8;
 typedef unsigned int uint;
+
+static const uint VU1_MEMSIZE	= 0x4000;		// 16kb
+static const uint VU1_PROGSIZE	= 0x4000;		// 16kb
+static const uint TPC = 26;
 
 union VECTOR {
 	struct {

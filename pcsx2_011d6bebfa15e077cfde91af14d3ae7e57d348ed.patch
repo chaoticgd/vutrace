@@ -1,9 +1,3 @@
-diff --git a/bin/resources/locale/hu_HU/pcsx2_Main.mo b/bin/resources/locale/hu_HU/pcsx2_Main.mo
-index 448be614b..dcfab3ad1 100644
-Binary files a/bin/resources/locale/hu_HU/pcsx2_Main.mo and b/bin/resources/locale/hu_HU/pcsx2_Main.mo differ
-diff --git a/bin/resources/locale/it_IT/pcsx2_Main.mo b/bin/resources/locale/it_IT/pcsx2_Main.mo
-index bb0b6b36f..1c0ef5425 100644
-Binary files a/bin/resources/locale/it_IT/pcsx2_Main.mo and b/bin/resources/locale/it_IT/pcsx2_Main.mo differ
 diff --git a/pcsx2/DebugTools/Debug.h b/pcsx2/DebugTools/Debug.h
 index afdd02f0f..cb83c0aa4 100644
 --- a/pcsx2/DebugTools/Debug.h

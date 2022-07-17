@@ -265,7 +265,7 @@ index bd14e206e..57dc14e55 100644
  	if (_Y) { ptr[2] = VU->VI[_It_].US[0]; ptr[3] = 0; }
  	if (_Z) { ptr[4] = VU->VI[_It_].US[0]; ptr[5] = 0; }
 diff --git a/pcsx2/Vif.cpp b/pcsx2/Vif.cpp
-index 00536be81..ebdd915bc 100644
+index 00536be81..8baab338e 100644
 --- a/pcsx2/Vif.cpp
 +++ b/pcsx2/Vif.cpp
 @@ -22,9 +22,165 @@
@@ -425,7 +425,7 @@ index 00536be81..ebdd915bc 100644
 +}
 +
 +void VUTracer::pushLastPacket() {
-+	if(ftell(trace_file) > 0) {
++	if(ftell(trace_file) > 8) {
 +		fputc(VUTRACE_PUSHSNAPSHOT, trace_file);
 +	}
 +}

@@ -10,17 +10,17 @@ It should build on Linux (GCC) or Windows (MSVC) but has mainly been tested on L
 
 ## vutrace Usage
 
-1. Checkout PCSX2 commit `58f5a5b915915293b90e7e8f34c33f9c0424d1e8` and apply the patch `pcsx2_58f5a5b915915293b90e7e8f34c33f9c0424d1e8.patch` to it using `git apply`, then build PCSX2.
+1. Checkout PCSX2 commit `011d6bebfa15e077cfde91af14d3ae7e57d348ed` and apply the patch `pcsx2_011d6bebfa15e077cfde91af14d3ae7e57d348ed.patch` to it using `git apply`, then build PCSX2.
 
 2. Build vutrace using cmake: `cmake . && cmake --build .`.
 
-3. Launch PCSX2 with a command similar to `./pcsx2/PCSX2 --gs=plugins/GSdx/libGSdx.so`.
+3. Launch PCSX2.
 
 4. In PCSX2, use the VU1 interpreter, don't use the VU0 interpreter, and set GSdx to software mode. I haven't tested it with MTVU enabled, so don't use that.
 
 5. Create a directory called `vutrace_output` in the working directory you ran PCSX2 from (it won't create the directory itself).
 
-6. Trace a frame using `Begin VU trace...` (warning: traces may be very large).
+6. Trace a frame using the menu item `System->Begin VU trace...` (warning: traces may be very large).
 
 7. Open a trace: `./vutrace (PCSX2 working dir)/vutrace_output/traceN.bin` where N is the index of the trace.
 
@@ -34,6 +34,11 @@ This is the disassembler split out into a seperate component.
 
 where `vu0MicroMem.bin` or `vu1MicroMem.bin` can be extracted from a PCSX2 save state.
 
+## Tips
+
+- A _log.txt file is written out with the trace with logs of all the VIF1 DMA transfers in it. If you know the address of one of the VIF command lists you're interested in, you can use this file to find the associated trace file.
+- For reversing model formats: Find the VIF command list from the model you want to work on, unpack the data manually and binary grep for it.
+
 ## Keyboard Controls
 
 - W - Step back one instruction.
@@ -45,6 +50,5 @@ where `vu0MicroMem.bin` or `vu1MicroMem.bin` can be extracted from a PCSX2 save 
 
 - vutrace: The GS packet parser assumes that the data transfer to the GS is instant.
 - vutrace: Parsing of REGLIST primitives is not supported.
-- patch: The version of PCSX2 that is supported is a bit out of date.
 - patch: Traces don't start and end on vsync so it doesn't always trace an entire frame.
 - patch: The framebuffer dumps aren't synced with the VU state dumps.

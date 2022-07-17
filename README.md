@@ -6,6 +6,8 @@ This is useful for reversing the renderers and model formats of PS2 games.
 
 It should build on Linux (GCC) or Windows (MSVC) but has mainly been tested on Linux.
 
+**The patch was last updated on 2022-07-17.**
+
 ## Screenshot
 
 ![Screenshot](screenshot.png)

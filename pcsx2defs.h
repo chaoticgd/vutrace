@@ -196,4 +196,88 @@ struct VURegs
 	u32 ialucount;
 };
 
+namespace old_pcsx2_structs {
+	struct fdivPipe {
+		int enable;
+		REG_VI reg;
+		u32 sCycle;
+		u32 Cycle;
+		u32 statusflag;
+	};
+
+	struct efuPipe {
+		int enable;
+		REG_VI reg;
+		u32 sCycle;
+		u32 Cycle;
+	};
+
+	struct fmacPipe {
+		int enable;
+		int reg;
+		int xyzw;
+		u32 sCycle;
+		u32 Cycle;
+		u32 macflag;
+		u32 statusflag;
+		u32 clipflag;
+	};
+
+	struct ialuPipe {
+		int enable;
+		int reg;
+		u32 sCycle;
+		u32 Cycle;
+	};
+
+	struct VURegs
+	{
+		VECTOR	VF[32]; // VF and VI need to be first in this struct for proper mapping
+		REG_VI	VI[32]; // needs to be 128bit x 32 (cottonvibes)
+
+		VECTOR ACC;
+		REG_VI q;
+		REG_VI p;
+
+		uint idx;		// VU index (0 or 1)
+
+		// flags/cycle are needed by VIF dma code, so they have to be here (for now)
+		// We may replace these by accessors in the future, if merited.
+		u32 cycle;
+		u32 flags;
+
+		// Current opcode being interpreted or recompiled (this var is used by Interps and superVU
+		// but not microVU.  Would like to have it local to their respective classes... someday)
+		u32 code;
+
+		// branch/branchpc are used by interpreter only, but making them local to the interpreter
+		// classes requires considerable code refactoring.  Maybe later. >_<
+		u32 branch;
+		u32 branchpc;
+		u32 delaybranchpc;
+		bool takedelaybranch;
+
+		// MAC/Status flags -- these are used by interpreters and superVU, but are kind of hacky
+		// and shouldn't be relied on for any useful/valid info.  Would like to move them out of
+		// this struct eventually.
+		u32 macflag;
+		u32 statusflag;
+		u32 clipflag;
+
+		u32 Mem;
+		u32 Micro;
+
+		u32 ebit;
+
+		u8 VIBackupCycles;
+		u32 VIOldValue;
+		u32 VIRegNumber;
+
+		fmacPipe fmac[8];
+		fdivPipe fdiv;
+		efuPipe efu;
+		ialuPipe ialu[8];
+	};
+};
+
 #endif

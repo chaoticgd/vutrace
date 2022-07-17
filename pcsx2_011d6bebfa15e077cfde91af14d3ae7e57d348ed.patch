@@ -265,10 +265,10 @@ index bd14e206e..57dc14e55 100644
  	if (_Y) { ptr[2] = VU->VI[_It_].US[0]; ptr[3] = 0; }
  	if (_Z) { ptr[4] = VU->VI[_It_].US[0]; ptr[5] = 0; }
 diff --git a/pcsx2/Vif.cpp b/pcsx2/Vif.cpp
-index 00536be81..39fad3924 100644
+index 00536be81..ebdd915bc 100644
 --- a/pcsx2/Vif.cpp
 +++ b/pcsx2/Vif.cpp
-@@ -22,9 +22,157 @@
+@@ -22,9 +22,165 @@
  #include "Gif.h"
  #include "MTVU.h"
  #include "Gif_Unit.h"
@@ -408,6 +408,14 @@ index 00536be81..39fad3924 100644
 +	if(trace_file == nullptr) {
 +		printf("[VUTrace] Fatal error: Cannot open trace file!\n");
 +	}
++	
++	// Write header.
++	fputc('V', trace_file);
++	fputc('U', trace_file);
++	fputc('T', trace_file);
++	fputc('R', trace_file);
++	int format_version = 2;
++	fwrite(&format_version, 4, 1, trace_file);
 +}
 +
 +void VUTracer::endTrace() {

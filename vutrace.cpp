@@ -722,6 +722,21 @@ void parse_trace(AppState &app, std::string trace_file_path)
 	
 	app.snapshots = {};
 	
+	char magic[4];
+	u32 version;
+	check_eof(fread(magic, 4, 1, trace));
+	if(memcmp(magic, "VUTR", 4) == 0) {
+		check_eof(fread(&version, 4, 1, trace));
+	} else {
+		version = 1;
+		fseek(trace, 0, SEEK_SET);
+	}
+	
+	if(version > 2) {
+		fprintf(stderr, "Format version too new!\n");
+		exit(1);
+	}
+	
 	Snapshot current;
 	VUTracePacketType packet_type;
 	while(fread(&packet_type, 1, 1, trace) == 1) {
@@ -751,7 +766,18 @@ void parse_trace(AppState &app, std::string trace_file_path)
 				break;
 			}
 			case VUTRACE_SETREGISTERS:
-				check_eof(fread(&current.registers, sizeof(VURegs), 1, trace));
+				if(version == 1) {
+					old_pcsx2_structs::VURegs old_regs;
+					check_eof(fread(&old_regs, sizeof(old_regs), 1, trace));
+					current.registers = {};
+					memcpy(current.registers.VF, old_regs.VF, sizeof(current.registers.VF));
+					memcpy(current.registers.VI, old_regs.VI, sizeof(current.registers.VI));
+					current.registers.ACC = old_regs.ACC;
+					current.registers.q = old_regs.q;
+					current.registers.p = old_regs.p;
+				} else {
+					check_eof(fread(&current.registers, sizeof(VURegs), 1, trace));
+				}
 				break;
 			case VUTRACE_SETMEMORY:
 				check_eof(fread(current.memory, VU1_MEMSIZE, 1, trace));

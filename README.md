@@ -2,6 +2,8 @@
 
 A tracing debugger for the PS2's second vector processing unit (VPU1). A modified version of PCSX2 can be used to dump out the state of VU1 after each instruction is executed, and the resultant traces can be viewed with the main vutrace application.
 
+This is useful for reversing the renderers and model formats of PS2 games.
+
 It should build on Linux (GCC) or Windows (MSVC) but has mainly been tested on Linux.
 
 ## Screenshot
@@ -37,7 +39,7 @@ where `vu0MicroMem.bin` or `vu1MicroMem.bin` can be extracted from a PCSX2 save 
 ## Tips
 
 - A _log.txt file is written out with the trace with logs of all the VIF1 DMA transfers in it. If you know the address of one of the VIF command lists you're interested in, you can use this file to find the associated trace file.
-- For reversing model formats: Find the VIF command list from the model you want to work on, unpack the data manually and binary grep for it.
+- If you have the data you're interested in but not its address, you can VIF unpack (see EE User's Manual section 6.3.4) the data manually and binary grep for it.
 
 ## Keyboard Controls
 

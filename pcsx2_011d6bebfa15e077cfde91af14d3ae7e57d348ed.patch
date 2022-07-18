@@ -435,7 +435,7 @@ index 00536be81..8baab338e 100644
  {
  	/* Reset the whole VIF, meaning the internal pcsx2 vars and all the registers */
 diff --git a/pcsx2/Vif.h b/pcsx2/Vif.h
-index 6a6ab0b18..324053286 100644
+index 6a6ab0b18..a41b56d5d 100644
 --- a/pcsx2/Vif.h
 +++ b/pcsx2/Vif.h
 @@ -20,6 +20,62 @@
@@ -446,7 +446,7 @@ index 6a6ab0b18..324053286 100644
 +
 +enum VUTracePacketType {
 +	VUTRACE_PUSHSNAPSHOT = 'P', // Next packet directly follows.
-+	VUTRACE_SETREGISTERS = 'R', // VURegs struct follows (32-bit pointers).
++	VUTRACE_SETREGISTERS = 'R', // VURegs struct follows.
 +	VUTRACE_SETMEMORY = 'M', // 16k memory follows.
 +	VUTRACE_SETINSTRUCTIONS = 'I', // 16k micromem follows.
 +	VUTRACE_LOADOP = 'L', // u32 address, u32 size follows.

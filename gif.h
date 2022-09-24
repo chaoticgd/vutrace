@@ -53,6 +53,65 @@ enum GsRegister
 	GSREG_NOP      = 0xf
 };
 
+enum GIF_A_D_REG
+{
+	GIF_A_D_REG_PRIM       = 0x00,
+	GIF_A_D_REG_RGBAQ      = 0x01,
+	GIF_A_D_REG_ST         = 0x02,
+	GIF_A_D_REG_UV         = 0x03,
+	GIF_A_D_REG_XYZF2      = 0x04,
+	GIF_A_D_REG_XYZ2       = 0x05,
+	GIF_A_D_REG_TEX0_1     = 0x06,
+	GIF_A_D_REG_TEX0_2     = 0x07,
+	GIF_A_D_REG_CLAMP_1    = 0x08,
+	GIF_A_D_REG_CLAMP_2    = 0x09,
+	GIF_A_D_REG_FOG        = 0x0a,
+	GIF_A_D_REG_XYZF3      = 0x0c,
+	GIF_A_D_REG_XYZ3       = 0x0d,
+	GIF_A_D_REG_NOP        = 0x0f,
+	GIF_A_D_REG_TEX1_1     = 0x14,
+	GIF_A_D_REG_TEX1_2     = 0x15,
+	GIF_A_D_REG_TEX2_1     = 0x16,
+	GIF_A_D_REG_TEX2_2     = 0x17,
+	GIF_A_D_REG_XYOFFSET_1 = 0x18,
+	GIF_A_D_REG_XYOFFSET_2 = 0x19,
+	GIF_A_D_REG_PRMODECONT = 0x1a,
+	GIF_A_D_REG_PRMODE     = 0x1b,
+	GIF_A_D_REG_TEXCLUT    = 0x1c,
+	GIF_A_D_REG_SCANMSK    = 0x22,
+	GIF_A_D_REG_MIPTBP1_1  = 0x34,
+	GIF_A_D_REG_MIPTBP1_2  = 0x35,
+	GIF_A_D_REG_MIPTBP2_1  = 0x36,
+	GIF_A_D_REG_MIPTBP2_2  = 0x37,
+	GIF_A_D_REG_TEXA       = 0x3b,
+	GIF_A_D_REG_FOGCOL     = 0x3d,
+	GIF_A_D_REG_TEXFLUSH   = 0x3f,
+	GIF_A_D_REG_SCISSOR_1  = 0x40,
+	GIF_A_D_REG_SCISSOR_2  = 0x41,
+	GIF_A_D_REG_ALPHA_1    = 0x42,
+	GIF_A_D_REG_ALPHA_2    = 0x43,
+	GIF_A_D_REG_DIMX       = 0x44,
+	GIF_A_D_REG_DTHE       = 0x45,
+	GIF_A_D_REG_COLCLAMP   = 0x46,
+	GIF_A_D_REG_TEST_1     = 0x47,
+	GIF_A_D_REG_TEST_2     = 0x48,
+	GIF_A_D_REG_PABE       = 0x49,
+	GIF_A_D_REG_FBA_1      = 0x4a,
+	GIF_A_D_REG_FBA_2      = 0x4b,
+	GIF_A_D_REG_FRAME_1    = 0x4c,
+	GIF_A_D_REG_FRAME_2    = 0x4d,
+	GIF_A_D_REG_ZBUF_1     = 0x4e,
+	GIF_A_D_REG_ZBUF_2     = 0x4f,
+	GIF_A_D_REG_BITBLTBUF  = 0x50,
+	GIF_A_D_REG_TRXPOS     = 0x51,
+	GIF_A_D_REG_TRXREG     = 0x52,
+	GIF_A_D_REG_TRXDIR     = 0x53,
+	GIF_A_D_REG_HWREG      = 0x54,
+	GIF_A_D_REG_SIGNAL     = 0x60,
+	GIF_A_D_REG_FINISH     = 0x61,
+	GIF_A_D_REG_LABEL      = 0x62,
+};
+
 enum GsPrimitiveType
 {
 	GSPRIM_POINT          = 0b000,
@@ -113,7 +172,7 @@ struct GsPackedData
 	GsRegister reg;
 	union {
 		struct {
-			GsRegister addr;
+			GIF_A_D_REG addr;
 			uint64_t data;
 		} ad;
 		struct {
@@ -228,8 +287,7 @@ void interpret_packed_data(GsPackedData &item)
 	
 	switch(item.reg) {
 		case GSREG_AD: {
-			// I'm not sure if we should be ignoring the high bits of ADDR.
-			item.ad.addr = (GsRegister) bit_range(hi, 0, 3);
+			item.ad.addr = (GIF_A_D_REG) bit_range(hi, 0, 7);
 			item.ad.data = lo;
 			break;
 		}
@@ -273,6 +331,67 @@ const char *gs_register_name(GsRegister reg)
 		case GSREG_XYZ3: return "XYZ3";
 		case GSREG_AD: return "AD";
 		case GSREG_NOP: return "NOP";
+		default: return "ERR";
+	}
+}
+
+const char* gif_ad_register_name(GIF_A_D_REG reg) {
+	switch(reg) {
+		case GIF_A_D_REG_PRIM: return "PRIM";
+		case GIF_A_D_REG_RGBAQ: return "RGBAQ";
+		case GIF_A_D_REG_ST: return "ST";
+		case GIF_A_D_REG_UV: return "UV";
+		case GIF_A_D_REG_XYZF2: return "XYZF2";
+		case GIF_A_D_REG_XYZ2: return "XYZ2";
+		case GIF_A_D_REG_TEX0_1: return "TEX0_1";
+		case GIF_A_D_REG_TEX0_2: return "TEX0_2";
+		case GIF_A_D_REG_CLAMP_1: return "CLAMP_1";
+		case GIF_A_D_REG_CLAMP_2: return "CLAMP_2";
+		case GIF_A_D_REG_FOG: return "FOG";
+		case GIF_A_D_REG_XYZF3: return "XYZF3";
+		case GIF_A_D_REG_XYZ3: return "XYZ3";
+		case GIF_A_D_REG_NOP: return "NOP";
+		case GIF_A_D_REG_TEX1_1: return "TEX1_1";
+		case GIF_A_D_REG_TEX1_2: return "TEX1_2";
+		case GIF_A_D_REG_TEX2_1: return "TEX2_1";
+		case GIF_A_D_REG_TEX2_2: return "TEX2_2";
+		case GIF_A_D_REG_XYOFFSET_1: return "XYOFFSET_1";
+		case GIF_A_D_REG_XYOFFSET_2: return "XYOFFSET_2";
+		case GIF_A_D_REG_PRMODECONT: return "PRMODECONT";
+		case GIF_A_D_REG_PRMODE: return "PRMODE";
+		case GIF_A_D_REG_TEXCLUT: return "TEXCLUT";
+		case GIF_A_D_REG_SCANMSK: return "SCANMSK";
+		case GIF_A_D_REG_MIPTBP1_1: return "MIPTBP1_1";
+		case GIF_A_D_REG_MIPTBP1_2: return "MIPTBP1_2";
+		case GIF_A_D_REG_MIPTBP2_1: return "MIPTBP2_1";
+		case GIF_A_D_REG_MIPTBP2_2: return "MIPTBP2_2";
+		case GIF_A_D_REG_TEXA: return "TEXA";
+		case GIF_A_D_REG_FOGCOL: return "FOGCOL";
+		case GIF_A_D_REG_TEXFLUSH: return "TEXFLUSH";
+		case GIF_A_D_REG_SCISSOR_1: return "SCISSOR_1";
+		case GIF_A_D_REG_SCISSOR_2: return "SCISSOR_2";
+		case GIF_A_D_REG_ALPHA_1: return "ALPHA_1";
+		case GIF_A_D_REG_ALPHA_2: return "ALPHA_2";
+		case GIF_A_D_REG_DIMX: return "DIMX";
+		case GIF_A_D_REG_DTHE: return "DTHE";
+		case GIF_A_D_REG_COLCLAMP: return "COLCLAMP";
+		case GIF_A_D_REG_TEST_1: return "TEST_1";
+		case GIF_A_D_REG_TEST_2: return "TEST_2";
+		case GIF_A_D_REG_PABE: return "PABE";
+		case GIF_A_D_REG_FBA_1: return "FBA_1";
+		case GIF_A_D_REG_FBA_2: return "FBA_2";
+		case GIF_A_D_REG_FRAME_1: return "FRAME_1";
+		case GIF_A_D_REG_FRAME_2: return "FRAME_2";
+		case GIF_A_D_REG_ZBUF_1: return "ZBUF_1";
+		case GIF_A_D_REG_ZBUF_2: return "ZBUF_2";
+		case GIF_A_D_REG_BITBLTBUF: return "BITBLTBUF";
+		case GIF_A_D_REG_TRXPOS: return "TRXPOS";
+		case GIF_A_D_REG_TRXREG: return "TRXREG";
+		case GIF_A_D_REG_TRXDIR: return "TRXDIR";
+		case GIF_A_D_REG_HWREG: return "HWREG";
+		case GIF_A_D_REG_SIGNAL: return "SIGNAL";
+		case GIF_A_D_REG_FINISH: return "FINISH";
+		case GIF_A_D_REG_LABEL: return "LABEL";
 		default: return "ERR";
 	}
 }

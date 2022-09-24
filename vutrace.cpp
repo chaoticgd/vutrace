@@ -632,7 +632,7 @@ void gs_packet_window(AppState &app)
 		ImGui::SameLine();
 		switch(item.reg) {
 			case GSREG_AD: {
-				ImGui::Text("%s <- %lx\n", gs_register_name(item.ad.addr), item.ad.data);
+				ImGui::Text("%s <- %lx\n", gif_ad_register_name(item.ad.addr), item.ad.data);
 				break;
 			}
 			case GSREG_XYZF2: {

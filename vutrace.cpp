@@ -364,7 +364,12 @@ void memory_window(AppState &app)
 		}
 	}
 	
-	static const int ROW_SIZE = 32;
+	ImGui::SameLine();
+    static int ROW_SIZE_IMGUI = 4;
+    static int ROW_SIZE = 16;
+    if (ImGui::SliderInt("ROWSIZE", &ROW_SIZE_IMGUI, 1, 16, "Bytes Per Row (4 bytes aligned): %d")) {
+        ROW_SIZE = ROW_SIZE_IMGUI * 4;
+    }
 	
 	ImGui::BeginChild("rows_outer");
 	if(ImGui::BeginChild("rows")) {
@@ -691,6 +696,7 @@ void walk_until_mem_access(AppState &app, u32 address)
 }
 
 enum VUTracePacketType {
+	DEFAULT = 0,
 	VUTRACE_PUSHSNAPSHOT = 'P', // Next packet directly follows.
 	VUTRACE_SETREGISTERS = 'R', // VURegs struct follows (32-bit pointers).
 	VUTRACE_SETMEMORY = 'M', // 16k memory follows.
@@ -738,7 +744,7 @@ void parse_trace(AppState &app, std::string trace_file_path)
 	}
 	
 	Snapshot current;
-	VUTracePacketType packet_type;
+	VUTracePacketType packet_type = 0;
 	while(fread(&packet_type, 1, 1, trace) == 1) {
 		switch(packet_type) {
 			case VUTRACE_PUSHSNAPSHOT: {

@@ -744,7 +744,7 @@ void parse_trace(AppState &app, std::string trace_file_path)
 	}
 	
 	Snapshot current;
-	VUTracePacketType packet_type = 0;
+	VUTracePacketType packet_type = DEFAULT;
 	while(fread(&packet_type, 1, 1, trace) == 1) {
 		switch(packet_type) {
 			case VUTRACE_PUSHSNAPSHOT: {

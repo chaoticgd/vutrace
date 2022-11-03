@@ -36,7 +36,7 @@ This is the disassembler split out into a seperate component.
 
 2. Open a memory dump: `./vudis vu0MicroMem.bin`.
 
-where `vu0MicroMem.bin` or `vu1MicroMem.bin` can be extracted from a PCSX2 save state. You may need to add `SavestateZstdCompression=disabled` to your `PCSX2_vm.ini` file for your savestates to be readable by certain archive utilities.
+where `vu0MicroMem.bin` or `vu1MicroMem.bin` can be extracted from a PCSX2 save state. You may need to add `SavestateZstdCompression=disabled` to your `PCSX2_vm.ini` file in the `EmuCore` section for your savestates to be readable by certain archive utilities.
 
 ## Tips
 

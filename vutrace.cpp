@@ -42,10 +42,9 @@ static const int INSN_PAIR_SIZE = 8;
 
 struct Snapshot
 {
-	VURegs registers;
+	VURegs registers = {};
 	u8 memory[VU1_MEMSIZE];
 	u8 program[VU1_PROGSIZE];
-	int disassembly;
 	u32 read_addr = 0;
 	u32 read_size = 0;
 	u32 write_addr = 0;
@@ -696,13 +695,15 @@ void walk_until_mem_access(AppState &app, u32 address)
 }
 
 enum VUTracePacketType {
-	DEFAULT = 0,
-	VUTRACE_PUSHSNAPSHOT = 'P', // Next packet directly follows.
-	VUTRACE_SETREGISTERS = 'R', // VURegs struct follows (32-bit pointers).
-	VUTRACE_SETMEMORY = 'M', // 16k memory follows.
-	VUTRACE_SETINSTRUCTIONS = 'I', // 16k micromem follows.
-	VUTRACE_LOADOP = 'L', // u32 address, u32 size follows.
-	VUTRACE_STOREOP = 'S' // u32 address, u32 size follows.
+	VUTRACE_NULLPACKET = 0,
+	VUTRACE_PUSHSNAPSHOT = 'P',
+	VUTRACE_SETREGISTERS = 'R',
+	VUTRACE_SETMEMORY = 'M',
+	VUTRACE_SETINSTRUCTIONS = 'I',
+	VUTRACE_LOADOP = 'L',
+	VUTRACE_STOREOP = 'S',
+	VUTRACE_PATCHREGISTER = 'r',
+	VUTRACE_PATCHMEMORY = 'm'
 };
 
 void parse_trace(AppState &app, std::string trace_file_path)
@@ -738,13 +739,13 @@ void parse_trace(AppState &app, std::string trace_file_path)
 		fseek(trace, 0, SEEK_SET);
 	}
 	
-	if(version > 2) {
+	if(version > 3) {
 		fprintf(stderr, "Format version too new!\n");
 		exit(1);
 	}
 	
 	Snapshot current;
-	VUTracePacketType packet_type = DEFAULT;
+	VUTracePacketType packet_type = VUTRACE_NULLPACKET;
 	while(fread(&packet_type, 1, 1, trace) == 1) {
 		switch(packet_type) {
 			case VUTRACE_PUSHSNAPSHOT: {
@@ -771,38 +772,89 @@ void parse_trace(AppState &app, std::string trace_file_path)
 				current.write_size = 0;
 				break;
 			}
-			case VUTRACE_SETREGISTERS:
+			case VUTRACE_SETREGISTERS: {
 				if(version == 1) {
-					old_pcsx2_structs::VURegs old_regs;
+					old_pcsx2_structs_v1::VURegs old_regs = {};
 					check_eof(fread(&old_regs, sizeof(old_regs), 1, trace));
-					current.registers = {};
+					memcpy(current.registers.VF, old_regs.VF, sizeof(current.registers.VF));
+					memcpy(current.registers.VI, old_regs.VI, sizeof(current.registers.VI));
+					current.registers.ACC = old_regs.ACC;
+					current.registers.q = old_regs.q;
+					current.registers.p = old_regs.p;
+				} else if(version == 2) {
+					old_pcsx2_structs_v2::VURegs old_regs = {};
+					check_eof(fread(&old_regs, sizeof(old_regs), 1, trace));
 					memcpy(current.registers.VF, old_regs.VF, sizeof(current.registers.VF));
 					memcpy(current.registers.VI, old_regs.VI, sizeof(current.registers.VI));
 					current.registers.ACC = old_regs.ACC;
 					current.registers.q = old_regs.q;
 					current.registers.p = old_regs.p;
 				} else {
-					check_eof(fread(&current.registers, sizeof(VURegs), 1, trace));
+					check_eof(fread(&current.registers.VF, sizeof(current.registers.VF), 1, trace));
+					check_eof(fread(&current.registers.VI, sizeof(current.registers.VI), 1, trace));
+					check_eof(fread(&current.registers.ACC, sizeof(current.registers.ACC), 1, trace));
+					check_eof(fread(&current.registers.q, sizeof(current.registers.q), 1, trace));
+					check_eof(fread(&current.registers.p, sizeof(current.registers.p), 1, trace));
 				}
 				break;
-			case VUTRACE_SETMEMORY:
+			}
+			case VUTRACE_SETMEMORY: {
 				check_eof(fread(current.memory, VU1_MEMSIZE, 1, trace));
 				break;
-			case VUTRACE_SETINSTRUCTIONS:
+			}
+			case VUTRACE_SETINSTRUCTIONS: {
 				check_eof(fread(current.program, VU1_PROGSIZE, 1, trace));
 				break;
-			case VUTRACE_LOADOP:
+			}
+			case VUTRACE_LOADOP: {
 				check_eof(fread(&current.read_addr, sizeof(u32), 1, trace));
 				check_eof(fread(&current.read_size, sizeof(u32), 1, trace));
 				break;
-			case VUTRACE_STOREOP:
+			}
+			case VUTRACE_STOREOP: {
 				check_eof(fread(&current.write_addr, sizeof(u32), 1, trace));
 				check_eof(fread(&current.write_size, sizeof(u32), 1, trace));
 				break;
-			default:
+			}
+			case VUTRACE_PATCHREGISTER: {
+				u8 index = 0;
+				u128 data = {};
+				check_eof(fread(&index, sizeof(u8), 1, trace));
+				check_eof(fread(&data, sizeof(u128), 1, trace));
+				if(index < 32) {
+					memcpy(&current.registers.VF[index], &data, 16);
+				} else if(index < 64) {
+					memcpy(&current.registers.VI[index - 32], &data, 16);
+				} else if(index == 64) {
+					memcpy(&current.registers.ACC, &data, 16);
+				} else if(index == 65) {
+					memcpy(&current.registers.q, &data, 16);
+				} else if(index == 66) {
+					memcpy(&current.registers.p, &data, 16);
+				} else {
+					fprintf(stderr, "Error: 'r' packet has bad register index.\n");
+					exit(1);
+				}
+				break;
+			}
+			case VUTRACE_PATCHMEMORY: {
+				u16 address = 0;
+				u32 data = 0;
+				check_eof(fread(&address, sizeof(u16), 1, trace));
+				check_eof(fread(&data, sizeof(u32), 1, trace));
+				if(address < VU1_MEMSIZE - 4) {
+					memcpy(&current.memory[address], &data, sizeof(data));
+				} else {
+					fprintf(stderr, "Error: 'm' packet has address that is too big.\n");
+					exit(1);
+				}
+				break;
+			}
+			default: {
 				fprintf(stderr, "Error: Invalid packet type 0x%x in trace file at 0x%lx!\n",
 					packet_type, ftell(trace));
 				exit(1);
+			}
 		}
 	}
 	if(!feof(trace)) {

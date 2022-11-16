@@ -3,8 +3,8 @@
 # This script uses ffmpeg to combine all the dumped framebuffers from a trace
 # session into a single video file.
 
-if [[ ! -f _log.txt ]] ; then
-	echo "_log.txt does not exist. You need to run this from the trace directory."
+if [[ ! -f LOG.txt ]] ; then
+	echo "LOG.txt does not exist. You need to run this from the trace directory."
 	exit 1
 fi
 

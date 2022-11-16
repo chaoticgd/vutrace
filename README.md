@@ -32,7 +32,7 @@ It should build on Linux (GCC) or Windows (MSVC) but has mainly been tested on L
 
 This is the disassembler split out into a seperate component.
 
-1. Build vutrace using cmake: `cmake . && cmake --build .`.
+1. Build vutrace using cmake: `cmake -S . -B bin/ && cmake --build bin/`.
 
 2. Open a memory dump: `./vudis vu0MicroMem.bin`.
 

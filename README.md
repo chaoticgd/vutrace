@@ -57,6 +57,17 @@ where `vu0MicroMem.bin` or `vu1MicroMem.bin` can be extracted from a PCSX2 save 
 - patch: Traces don't start and end on vsync so it doesn't always trace an entire frame.
 - patch: The framebuffer dumps aren't synced with the VU state dumps.
 
+## Recent Changelog
+
+### 2022-11-16
+
+- Created version 3 of the trace file format, which drastically reduces file sizes by only storing registers and sections of memory that were modified.
+
+### 2022-10-18
+
+- Added a slider for the row size in the memory view. [wagrenier](https://github.com/wagrenier)
+- Fixed an issue preventing vutrace from being compiled on Windows. [wagrenier](https://github.com/wagrenier)
+
 ## File Formats
 
 ### Comments File

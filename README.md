@@ -50,6 +50,13 @@ where `vu0MicroMem.bin` or `vu1MicroMem.bin` can be extracted from a PCSX2 save 
 - A - Step back one loop iteration (until the PC is the same as it was originally).
 - D - Step forward one loop iteration (until the PC is the same as it was originally).
 
+## Known Issues
+
+- vutrace: The GS packet parser assumes that the data transfer to the GS is instant.
+- vutrace: Parsing of REGLIST primitives is not supported.
+- patch: Traces don't start and end on vsync so it doesn't always trace an entire frame.
+- patch: The framebuffer dumps aren't synced with the VU state dumps.
+
 ## File Formats
 
 ### Comments File
@@ -65,7 +72,7 @@ Stores a series of snapshots recording the state of VU1 over the course of an ex
 | Version | Notes |
 | - | - |
  3 | Replaced the VURegs struct with a more well-defined data format. |
-| 2 | Introduced a file header (really high tech). Changed the VURegs to use 64-bit pointers. |
+| 2 | Introduced a file header (really high tech). Updated the VURegs struct to use 64-bit pointers. |
 | 1 | Initial version. |
 
 #### File Structure
@@ -97,8 +104,8 @@ Set the registers structure of the current snapshot. Data format:
 | 0x0 | VF | u128[32] | The floating point registers. |
 | 0x200 | VI | u128[32] | The integer registers. |
 | 0x400 | ACC | u128 | The accumulator register. |
-| 0x410 | Q | u16 | The Q register. |
-| 0x420 | P | u16 | The P register. |
+| 0x410 | Q | u128 | The Q register. |
+| 0x420 | P | u128 | The P register. |
 
 In version 2 of the format, the VURegs struct from PCSX2 was written to the file directly. In version 1 of this format, the 32-bit version of this struct was written directly.
 
@@ -145,10 +152,3 @@ Patch the memory of the current snapshot. Data format:
 | - | - | - | - |
 | 0x0 | offset | u16 | VU memory address (in bytes). |
 | 0x2 | data | u32 | Data to be written. |
-
-## Known Issues
-
-- vutrace: The GS packet parser assumes that the data transfer to the GS is instant.
-- vutrace: Parsing of REGLIST primitives is not supported.
-- patch: Traces don't start and end on vsync so it doesn't always trace an entire frame.
-- patch: The framebuffer dumps aren't synced with the VU state dumps.

@@ -1,16 +1,3 @@
-diff --git a/common/Vulkan/Context.cpp b/common/Vulkan/Context.cpp
-index 9bcdf6862..04752efac 100644
---- a/common/Vulkan/Context.cpp
-+++ b/common/Vulkan/Context.cpp
-@@ -463,7 +463,7 @@ namespace Vulkan
- 		m_optional_extensions.vk_arm_rasterization_order_attachment_access =
- 			SupportsExtension(VK_ARM_RASTERIZATION_ORDER_ATTACHMENT_ACCESS_EXTENSION_NAME, false);
- 		m_optional_extensions.vk_khr_fragment_shader_barycentric =
--			SupportsExtension(VK_KHR_FRAGMENT_SHADER_BARYCENTRIC_EXTENSION_NAME, false);
-+			false;//SupportsExtension(VK_KHR_FRAGMENT_SHADER_BARYCENTRIC_EXTENSION_NAME, false);
- 
- 		return true;
- 	}
 diff --git a/pcsx2/CMakeLists.txt b/pcsx2/CMakeLists.txt
 index bda21b347..0d70036c4 100644
 --- a/pcsx2/CMakeLists.txt

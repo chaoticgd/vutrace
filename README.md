@@ -6,7 +6,7 @@ This is useful for reversing the renderers and model formats of PS2 games.
 
 It should build on Linux (GCC) or Windows (MSVC) but has mainly been tested on Linux.
 
-**The patch was last updated on 2022-07-17.**
+**The patch was last updated on 2022-11-16. The traces are no longer huge and trace sessions will actually start and stop on vsync!**
 
 ## Screenshot
 
@@ -14,7 +14,7 @@ It should build on Linux (GCC) or Windows (MSVC) but has mainly been tested on L
 
 ## vutrace Usage
 
-1. Checkout PCSX2 commit `011d6bebfa15e077cfde91af14d3ae7e57d348ed` and apply the patch `pcsx2_011d6bebfa15e077cfde91af14d3ae7e57d348ed.patch` to it using `git apply`, then build PCSX2.
+1. Checkout PCSX2 commit `e5bc1defa293524aa1da9cfbc568d5f986884801` and apply the patch `pcsx2_e5bc1defa293524aa1da9cfbc568d5f986884801.patch` to it using `git apply`, then build PCSX2.
 
 2. Build vutrace using cmake: `cmake . && cmake --build .`.
 
@@ -24,7 +24,7 @@ It should build on Linux (GCC) or Windows (MSVC) but has mainly been tested on L
 
 5. Create a directory called `vutrace_output` in the working directory you ran PCSX2 from (it won't create the directory itself).
 
-6. Trace a frame using the menu item `System->Begin VU trace...` (warning: traces may be very large).
+6. Trace a frame using the menu item `System->Begin VU trace...`.
 
 7. Open a trace: `./vutrace (PCSX2 working dir)/vutrace_output/traceN.bin` where N is the index of the trace.
 
@@ -54,7 +54,6 @@ where `vu0MicroMem.bin` or `vu1MicroMem.bin` can be extracted from a PCSX2 save 
 
 - vutrace: The GS packet parser assumes that the data transfer to the GS is instant.
 - vutrace: Parsing of REGLIST primitives is not supported.
-- patch: Traces don't start and end on vsync so it doesn't always trace an entire frame.
 - patch: The framebuffer dumps aren't synced with the VU state dumps.
 
 ## Recent Changelog
@@ -62,6 +61,7 @@ where `vu0MicroMem.bin` or `vu1MicroMem.bin` can be extracted from a PCSX2 save 
 ### 2022-11-16
 
 - Created version 3 of the trace file format, which drastically reduces file sizes by only storing registers and sections of memory that were modified.
+- Trace sessions now start and end on vsync.
 
 ### 2022-10-18
 

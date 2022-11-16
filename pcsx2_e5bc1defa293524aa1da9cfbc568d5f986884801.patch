@@ -1,0 +1,790 @@
+diff --git a/common/Vulkan/Context.cpp b/common/Vulkan/Context.cpp
+index 9bcdf6862..04752efac 100644
+--- a/common/Vulkan/Context.cpp
++++ b/common/Vulkan/Context.cpp
+@@ -463,7 +463,7 @@ namespace Vulkan
+ 		m_optional_extensions.vk_arm_rasterization_order_attachment_access =
+ 			SupportsExtension(VK_ARM_RASTERIZATION_ORDER_ATTACHMENT_ACCESS_EXTENSION_NAME, false);
+ 		m_optional_extensions.vk_khr_fragment_shader_barycentric =
+-			SupportsExtension(VK_KHR_FRAGMENT_SHADER_BARYCENTRIC_EXTENSION_NAME, false);
++			false;//SupportsExtension(VK_KHR_FRAGMENT_SHADER_BARYCENTRIC_EXTENSION_NAME, false);
+ 
+ 		return true;
+ 	}
+diff --git a/pcsx2/CMakeLists.txt b/pcsx2/CMakeLists.txt
+index bda21b347..0d70036c4 100644
+--- a/pcsx2/CMakeLists.txt
++++ b/pcsx2/CMakeLists.txt
+@@ -188,7 +188,8 @@ set(pcsx2Sources
+ 	VU1microInterp.cpp
+ 	VUflags.cpp
+ 	VUmicroMem.cpp
+-	VUops.cpp)
++	VUops.cpp
++	VUtracer.cpp)
+ 
+ # Main pcsx2 header
+ set(pcsx2Headers
+diff --git a/pcsx2/Counters.cpp b/pcsx2/Counters.cpp
+index 3193ad000..9153f22cc 100644
+--- a/pcsx2/Counters.cpp
++++ b/pcsx2/Counters.cpp
+@@ -557,6 +557,7 @@ static __fi void frameLimitUpdateCore()
+ 	if (VMManager::Internal::IsExecutionInterrupted())
+ 		Cpu->ExitExecution();
+ #endif
++	VUTracer::get().onVsync();
+ }
+ 
+ // Framelimiter - Measures the delta time between calls and stalls until a
+diff --git a/pcsx2/DebugTools/Debug.h b/pcsx2/DebugTools/Debug.h
+index a96e40e24..aa4f7a08d 100644
+--- a/pcsx2/DebugTools/Debug.h
++++ b/pcsx2/DebugTools/Debug.h
+@@ -369,6 +369,20 @@ extern void __Log( const char* fmt, ... );
+ #define VifCodeLog		macTrace(EE.VIFcode)
+ #define GifTagLog		macTrace(EE.GIFtag)
+ 
++void vutrace_log(const char* prefix, const char* fmt, ...);
++
++#undef DMA_LOG
++#define DMA_LOG(...) \
++	macTrace(EE.DMAhw)(__VA_ARGS__); \
++	vutrace_log("[DMA] ", __VA_ARGS__)
++#undef VIF_LOG
++#define VIF_LOG(...) \
++	macTrace(EE.VIF)(__VA_ARGS__); \
++	vutrace_log("[VIF] ", __VA_ARGS__)
++#undef VifCodeLog
++#define VifCodeLog(...) \
++	macTrace(EE.VIFcode)(__VA_ARGS__); \
++	vutrace_log("[VifCode] ", __VA_ARGS__)
+ 
+ #define PSXBIOS_LOG		macTrace(IOP.Bios)
+ #define PSXCPU_LOG		macTrace(IOP.R3000A)
+diff --git a/pcsx2/GS/GS.cpp b/pcsx2/GS/GS.cpp
+index fa88fb279..3f4c0e63c 100644
+--- a/pcsx2/GS/GS.cpp
++++ b/pcsx2/GS/GS.cpp
+@@ -1821,4 +1821,10 @@ BEGIN_HOTKEY_LIST(g_gs_hotkeys)
+ 	 }},
+ END_HOTKEY_LIST()
+ 
++void GSvutraceSetTraceIndex(int index)
++{
++	VUTraceGSSideData::get().vutrace_trace_index = index;
++	VUTraceGSSideData::get().vutrace_backbuffer_index = 0;
++}
++
+ #endif
+diff --git a/pcsx2/GS/Renderers/SW/GSRendererSW.cpp b/pcsx2/GS/Renderers/SW/GSRendererSW.cpp
+index 4aaa58388..a508d710a 100644
+--- a/pcsx2/GS/Renderers/SW/GSRendererSW.cpp
++++ b/pcsx2/GS/Renderers/SW/GSRendererSW.cpp
+@@ -27,6 +27,11 @@ CONSTINIT const GSVector4 GSVertexSW::m_pos_scale = GSVector4::cxpr(1.0f / 16, 1
+ CONSTINIT const GSVector8 GSVertexSW::m_pos_scale2 = GSVector8::cxpr(1.0f / 16, 1.0f / 16, 1.0f, 128.0f, 1.0f / 16, 1.0f / 16, 1.0f, 128.0f);
+ #endif
+ 
++void GS_vutraceSetTraceIndex(int index) {
++	VUTraceGSSideData::get().vutrace_trace_index = index;
++	VUTraceGSSideData::get().vutrace_backbuffer_index = 0;
++}
++
+ GSRendererSW::GSRendererSW(int threads)
+ 	: GSRenderer(), m_fzb(NULL)
+ {
+@@ -516,6 +521,14 @@ void GSRendererSW::Draw()
+ 	{
+ 		Queue(data);
+ 	}
++	
++	VUTraceGSSideData& vutrace = VUTraceGSSideData::get();
++	if(vutrace.vutrace_trace_index != -1)
++	{
++		std::string s = StringUtil::StdStringFromFormat("vutrace_output/trace%06d_buffer%d.bmp", vutrace.vutrace_trace_index, vutrace.vutrace_backbuffer_index++);
++		printf("[VUTrace] Dumping framebuffer: %s\n", s.c_str());
++		m_mem.SaveBMP(s, m_context->FRAME.Block(), m_context->FRAME.FBW, m_context->FRAME.PSM, GetFrameRect().width(), 512);
++	}
+ 
+ 	/*
+ 	if(0)//stats.ticks > 5000000)
+diff --git a/pcsx2/GS/Renderers/SW/GSRendererSW.h b/pcsx2/GS/Renderers/SW/GSRendererSW.h
+index 85c63b99c..c25742e05 100644
+--- a/pcsx2/GS/Renderers/SW/GSRendererSW.h
++++ b/pcsx2/GS/Renderers/SW/GSRendererSW.h
+@@ -19,6 +19,16 @@
+ #include "GSDrawScanline.h"
+ #include "GS/GSRingHeap.h"
+ 
++struct VUTraceGSSideData {
++	int vutrace_trace_index = -1;
++	int vutrace_backbuffer_index = 0;
++	
++	static VUTraceGSSideData& get() {
++		static VUTraceGSSideData instance;
++		return instance;
++	}
++};
++
+ class GSRendererSW final : public GSRenderer
+ {
+ public:
+diff --git a/pcsx2/MTGS.cpp b/pcsx2/MTGS.cpp
+index c8e94e71e..aae795a21 100644
+--- a/pcsx2/MTGS.cpp
++++ b/pcsx2/MTGS.cpp
+@@ -284,6 +284,8 @@ bool SysMtgsThread::TryOpenGS()
+ 	return true;
+ }
+ 
++void GS_vutraceSetTraceIndex(int index);
++
+ void SysMtgsThread::MainLoop()
+ {
+ 	// Threading info: run in MTGS thread
+@@ -348,7 +350,9 @@ void SysMtgsThread::MainLoop()
+ 			ringposStack.pop_back();
+ 			m_lock_Stack.Release();
+ #endif
+-
++			
++			GS_vutraceSetTraceIndex(VUTracer::get().trace_index);
++			
+ 			switch (tag.command)
+ 			{
+ #if COPY_GS_PACKET_TO_MTGS == 1
+diff --git a/pcsx2/VU1micro.cpp b/pcsx2/VU1micro.cpp
+index 32d7d0ffd..433de1a9e 100644
+--- a/pcsx2/VU1micro.cpp
++++ b/pcsx2/VU1micro.cpp
+@@ -79,6 +79,8 @@ void vu1ExecMicro(u32 addr)
+ 	static int count = 0;
+ 	vu1Finish(false);
+ 
++	VUTracer::get().onVu1ExecMicro(addr);
++
+ 	VUM_LOG("vu1ExecMicro %x (count=%d)", addr, count++);
+ 	VU1.cycle = cpuRegs.cycle;
+ 	VU0.VI[REG_VPU_STAT].UL &= ~0xFF00;
+diff --git a/pcsx2/VU1microInterp.cpp b/pcsx2/VU1microInterp.cpp
+index 23ff27a1b..63e753824 100644
+--- a/pcsx2/VU1microInterp.cpp
++++ b/pcsx2/VU1microInterp.cpp
+@@ -268,6 +268,7 @@ void InterpVU1::Step()
+ {
+ 	VU1.VI[REG_TPC].UL &= VU1_PROGMASK;
+ 	vu1Exec(&VU1);
++	VUTracer::get().onInstructionExecuted(&VU1);
+ }
+ 
+ void InterpVU1::Execute(u32 cycles)
+diff --git a/pcsx2/VUops.cpp b/pcsx2/VUops.cpp
+index 0c3541931..c778be63b 100644
+--- a/pcsx2/VUops.cpp
++++ b/pcsx2/VUops.cpp
+@@ -1936,11 +1936,27 @@ static __fi void _vuMR32(VURegs* VU)
+ //  Load / Store Instructions (VU Interpreter)
+ // --------------------------------------------------------------------------------------
+ 
+-__fi u32* GET_VU_MEM(VURegs* VU, u32 addr) // non-static, also used by sVU for now.
++__fi u32* GET_VU_MEM(VURegs* VU, u32 addr)
+ {
+-	if (VU == &vuRegs[1])
++	if (VU == &vuRegs[1]) {
++		Console.Warning("You need to use the VU1 interpreter!!!\n");
+ 		return (u32*)(vuRegs[1].Mem + (addr & 0x3fff));
+-	else if (addr & 0x4000)
++	} else if (addr & 0x4000)
++		return (u32*)((u8*)vuRegs[1].VF + (addr & 0x3ff)); // get VF and VI regs (they're mapped to 0x4xx0 in VU0 mem!)
++	else
++		return (u32*)(vuRegs[0].Mem + (addr & 0xfff)); // for addr 0x0000 to 0x4000 just wrap around
++}
++
++__fi u32* GET_VU_MEM(VURegs* VU, u32 addr, bool isWriting)		// non-static, also used by sVU for now.
++{
++	if (VU == &vuRegs[1]) {
++		if(isWriting) {
++			VUTracer::get().onMemoryWrite(addr, 0x10);
++		} else {
++			VUTracer::get().onMemoryRead(addr, 0x10);
++		}
++		return (u32*)(vuRegs[1].Mem + (addr & 0x3fff));
++	} else if (addr & 0x4000)
+ 		return (u32*)((u8*)vuRegs[1].VF + (addr & 0x3ff)); // get VF and VI regs (they're mapped to 0x4xx0 in VU0 mem!)
+ 	else
+ 		return (u32*)(vuRegs[0].Mem + (addr & 0xfff)); // for addr 0x0000 to 0x4000 just wrap around
+@@ -1954,7 +1970,7 @@ static __ri void _vuLQ(VURegs* VU)
+ 	s16 imm = (VU->code & 0x400) ? (VU->code & 0x3ff) | 0xfc00 : (VU->code & 0x3ff);
+ 	u16 addr = ((imm + VU->VI[_Is_].SS[0]) * 16);
+ 
+- 	u32* ptr = (u32*)GET_VU_MEM(VU, addr);
++ 	u32* ptr = (u32*)GET_VU_MEM(VU, addr, false);
+ 	if (_X) VU->VF[_Ft_].UL[0] = ptr[0];
+ 	if (_Y) VU->VF[_Ft_].UL[1] = ptr[1];
+ 	if (_Z) VU->VF[_Ft_].UL[2] = ptr[2];
+@@ -1970,7 +1986,7 @@ static __ri void _vuLQD(VURegs* VU)
+ 		return;
+ 
+ 	u32 addr = (VU->VI[_Is_].US[0] * 16);
+-	u32* ptr = (u32*)GET_VU_MEM(VU, addr);
++	u32* ptr = (u32*)GET_VU_MEM(VU, addr, false);
+ 	if (_X) VU->VF[_Ft_].UL[0] = ptr[0];
+ 	if (_Y) VU->VF[_Ft_].UL[1] = ptr[1];
+ 	if (_Z) VU->VF[_Ft_].UL[2] = ptr[2];
+@@ -1983,7 +1999,7 @@ static __ri void _vuLQI(VURegs* VU)
+ 	if (_Ft_)
+ 	{
+ 		u32 addr = (VU->VI[_Is_].US[0] * 16);
+-		u32* ptr = (u32*)GET_VU_MEM(VU, addr);
++		u32* ptr = (u32*)GET_VU_MEM(VU, addr, false);
+ 		if (_X) VU->VF[_Ft_].UL[0] = ptr[0];
+ 		if (_Y) VU->VF[_Ft_].UL[1] = ptr[1];
+ 		if (_Z) VU->VF[_Ft_].UL[2] = ptr[2];
+@@ -1997,7 +2013,7 @@ static __ri void _vuSQ(VURegs* VU)
+ {
+ 	s16 imm = (VU->code & 0x400) ? (VU->code & 0x3ff) | 0xfc00 : (VU->code & 0x3ff);
+ 	u16 addr = ((imm + VU->VI[_It_].SS[0]) * 16);
+-	u32* ptr = (u32*)GET_VU_MEM(VU, addr);
++	u32* ptr = (u32*)GET_VU_MEM(VU, addr, true);
+ 	if (_X) ptr[0] = VU->VF[_Fs_].UL[0];
+ 	if (_Y) ptr[1] = VU->VF[_Fs_].UL[1];
+ 	if (_Z) ptr[2] = VU->VF[_Fs_].UL[2];
+@@ -2010,7 +2026,7 @@ static __ri void _vuSQD(VURegs* VU)
+ 	if (_Ft_ != 0)
+ 		VU->VI[_It_].US[0]--;
+ 	u32 addr = (VU->VI[_It_].US[0] * 16);
+-	u32* ptr = (u32*)GET_VU_MEM(VU, addr);
++	u32* ptr = (u32*)GET_VU_MEM(VU, addr, true);
+ 	if (_X) ptr[0] = VU->VF[_Fs_].UL[0];
+ 	if (_Y) ptr[1] = VU->VF[_Fs_].UL[1];
+ 	if (_Z) ptr[2] = VU->VF[_Fs_].UL[2];
+@@ -2021,7 +2037,7 @@ static __ri void _vuSQI(VURegs* VU)
+ {
+ 	_vuBackupVI(VU, _It_);
+ 	u32 addr = (VU->VI[_It_].US[0] * 16);
+-	u32* ptr = (u32*)GET_VU_MEM(VU, addr);
++	u32* ptr = (u32*)GET_VU_MEM(VU, addr, true);
+ 	if (_X) ptr[0] = VU->VF[_Fs_].UL[0];
+ 	if (_Y) ptr[1] = VU->VF[_Fs_].UL[1];
+ 	if (_Z) ptr[2] = VU->VF[_Fs_].UL[2];
+@@ -2036,7 +2052,7 @@ static __ri void _vuILW(VURegs* VU)
+ 
+ 	s16 imm = (VU->code & 0x400) ? (VU->code & 0x3ff) | 0xfc00 : (VU->code & 0x3ff);
+ 	u16 addr = ((imm + VU->VI[_Is_].SS[0]) * 16);
+-	u16* ptr = (u16*)GET_VU_MEM(VU, addr);
++	u16* ptr = (u16*)GET_VU_MEM(VU, addr, false);
+ 
+ 	if (_X) VU->VI[_It_].US[0] = ptr[0];
+ 	if (_Y) VU->VI[_It_].US[0] = ptr[2];
+@@ -2048,7 +2064,7 @@ static __fi void _vuISW(VURegs* VU)
+ {
+ 	s16 imm = (VU->code & 0x400) ? (VU->code & 0x3ff) | 0xfc00 : (VU->code & 0x3ff);
+ 	u16 addr = ((imm + VU->VI[_Is_].SS[0]) * 16);
+-	u16* ptr = (u16*)GET_VU_MEM(VU, addr);
++	u16* ptr = (u16*)GET_VU_MEM(VU, addr, true);
+ 	if (_X) { ptr[0] = VU->VI[_It_].US[0]; ptr[1] = 0; }
+ 	if (_Y) { ptr[2] = VU->VI[_It_].US[0]; ptr[3] = 0; }
+ 	if (_Z) { ptr[4] = VU->VI[_It_].US[0]; ptr[5] = 0; }
+@@ -2061,7 +2077,7 @@ static __ri void _vuILWR(VURegs* VU)
+ 		return;
+ 
+ 	u32 addr = (VU->VI[_Is_].US[0] * 16);
+-	u16* ptr = (u16*)GET_VU_MEM(VU, addr);
++	u16* ptr = (u16*)GET_VU_MEM(VU, addr, false);
+ 
+ 	if (_X) VU->VI[_It_].US[0] = ptr[0];
+ 	if (_Y) VU->VI[_It_].US[0] = ptr[2];
+@@ -2072,7 +2088,7 @@ static __ri void _vuILWR(VURegs* VU)
+ static __ri void _vuISWR(VURegs* VU)
+ {
+ 	u32 addr = (VU->VI[_Is_].US[0] * 16);
+-	u16* ptr = (u16*)GET_VU_MEM(VU, addr);
++	u16* ptr = (u16*)GET_VU_MEM(VU, addr, true);
+ 	if (_X) { ptr[0] = VU->VI[_It_].US[0]; ptr[1] = 0; }
+ 	if (_Y) { ptr[2] = VU->VI[_It_].US[0]; ptr[3] = 0; }
+ 	if (_Z) { ptr[4] = VU->VI[_It_].US[0]; ptr[5] = 0; }
+diff --git a/pcsx2/VUtracer.cpp b/pcsx2/VUtracer.cpp
+new file mode 100644
+index 000000000..f2564894b
+--- /dev/null
++++ b/pcsx2/VUtracer.cpp
+@@ -0,0 +1,249 @@
++/*
++	vutrace - Hacky VU tracer/debugger.
++	Copyright (C) 2022 chaoticgd
++
++	This program is free software: you can redistribute it and/or modify
++	it under the terms of the GNU General Public License as published by
++	the Free Software Foundation, either version 3 of the License, or
++	(at your option) any later version.
++
++	This program is distributed in the hope that it will be useful,
++	but WITHOUT ANY WARRANTY; without even the implied warranty of
++	MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++	GNU General Public License for more details.
++
++	You should have received a copy of the GNU General Public License
++	along with this program.  If not, see <https://www.gnu.org/licenses/>.
++*/
++
++#include "VUtracer.h"
++
++#include "PrecompiledHeader.h"
++#include "Common.h"
++#include "Vif.h"
++#include "Vif_Dma.h"
++#include "newVif.h"
++#include "GS.h"
++#include "Gif.h"
++#include "MTVU.h"
++#include "Gif_Unit.h"
++#include "DebugTools/Debug.h"
++
++VUTracer::VUTracer() {
++	last_regs = new VURegs;
++}
++
++void VUTracer::onTraceMenuItemClicked() {
++	if(status == VUTRACESTATUS_DISABLED) {
++		status = VUTRACESTATUS_WAITING;
++	}
++}
++
++void VUTracer::onVsync() {
++	if(status == VUTRACESTATUS_WAITING) {
++		status = VUTRACESTATUS_TRACING;
++		beginTraceSession();
++	} else if(status == VUTRACESTATUS_TRACING) {
++		status = VUTRACESTATUS_DISABLED;
++		endTraceSession();
++	}
++}
++
++void VUTracer::onVif1DmaSendChain(u32 tadr) {
++	
++}
++
++void VUTracer::onVifDmaTag(u32 madr, u64 dma_tag) {
++	
++}
++
++void VUTracer::onVu1ExecMicro(u32 pc) {
++	if(status == VUTRACESTATUS_TRACING) {
++		endTrace();
++		beginTrace();
++	}
++}
++
++void VUTracer::onInstructionExecuted(VURegs* regs) {
++	if(status == VUTRACESTATUS_TRACING) {
++		pushLastPacket();
++		
++		// Only write the microcode out once per file.
++		if(!has_output_instructions) {
++			fputc(VUTRACE_SETINSTRUCTIONS, trace_file);
++			fwrite(regs->Micro, VU1_PROGSIZE, 1, trace_file);
++			has_output_instructions = true;
++		}
++		
++		// Only write out the registers that have changed.
++		if(!last_regs_populated) {
++			fputc(VUTRACE_SETREGISTERS, trace_file);
++			fwrite(&regs->VF, sizeof(regs->VF), 1, trace_file);
++			fwrite(&regs->VI, sizeof(regs->VI), 1, trace_file);
++			fwrite(&regs->ACC, sizeof(regs->ACC), 1, trace_file);
++			fwrite(&regs->q, sizeof(regs->q), 1, trace_file);
++			fwrite(&regs->p, sizeof(regs->p), 1, trace_file);
++			memcpy(last_regs, regs, sizeof(VURegs));
++			last_regs_populated = true;
++		} else {
++			// Floating point registers.
++			for(u8 i = 0; i < 32; i++) {
++				if(memcmp(&last_regs->VF[i], &regs->VF[i], 16) != 0) {
++					fputc(VUTRACE_PATCHREGISTER, trace_file);
++					u8 register_index = i;
++					fwrite(&register_index, 1, 1, trace_file);
++					fwrite(&regs->VF[i], 16, 1, trace_file);
++					memcpy(&last_regs->VF[i], &regs->VF[i], 16);
++				}
++			}
++			
++			// Integer registers.
++			for(u8 i = 0; i < 32; i++) {
++				if(memcmp(&last_regs->VI[i], &regs->VI[i], 16) != 0) {
++					fputc(VUTRACE_PATCHREGISTER, trace_file);
++					u8 register_index = 32 + i;
++					fwrite(&register_index, 1, 1, trace_file);
++					fwrite(&regs->VI[i], 16, 1, trace_file);
++					memcpy(&last_regs->VI[i], &regs->VI[i], 16);
++				}
++			}
++			
++			// Other registers.
++			if(memcmp(&last_regs->ACC, &regs->ACC, 16) != 0) {
++				fputc(VUTRACE_PATCHREGISTER, trace_file);
++				u8 register_index = 64;
++				fwrite(&register_index, 1, 1, trace_file);
++				fwrite(&regs->ACC, 16, 1, trace_file);
++				memcpy(&last_regs->ACC, &regs->ACC, 16);
++			}
++			if(memcmp(&last_regs->q, &regs->q, 16) != 0) {
++				fputc(VUTRACE_PATCHREGISTER, trace_file);
++				u8 register_index = 65;
++				fwrite(&register_index, 1, 1, trace_file);
++				fwrite(&regs->q, 16, 1, trace_file);
++				memcpy(&last_regs->q, &regs->q, 16);
++			}
++			if(memcmp(&last_regs->p, &regs->p, 16) != 0) {
++				fputc(VUTRACE_PATCHREGISTER, trace_file);
++				u8 register_index = 66;
++				fwrite(&register_index, 1, 1, trace_file);
++				fwrite(&regs->p, 16, 1, trace_file);
++				memcpy(&last_regs->p, &regs->p, 16);
++			}
++		}
++		
++		// Only write out the values from memory that have changed.
++		if(!last_memory_populated) {
++			fputc(VUTRACE_SETMEMORY, trace_file);
++			fwrite(regs->Mem, VU1_MEMSIZE, 1, trace_file);
++			memcpy(last_memory, regs->Mem, VU1_MEMSIZE);
++			last_memory_populated = true;
++		} else {
++			for(u32 i = 0; i < VU1_MEMSIZE; i += 4) {
++				if(memcmp(&last_memory[i], &regs->Mem[i], 4) != 0) {
++					fputc(VUTRACE_PATCHMEMORY, trace_file);
++					fwrite(&i, 2, 1, trace_file);
++					fwrite(&regs->Mem[i], 4, 1, trace_file);
++					memcpy(&last_memory[i], &regs->Mem[i], 4);
++				}
++			}
++		}
++		
++		// Keep track of which instructions are loads and stores.
++		if(read_size > 0) {
++			fputc(VUTRACE_LOADOP, trace_file);
++			fwrite(&read_addr, sizeof(u32), 1, trace_file);
++			fwrite(&read_size, sizeof(u32), 1, trace_file);
++			read_size = 0;
++		}
++		
++		if(write_size > 0) {
++			fputc(VUTRACE_STOREOP, trace_file);
++			fwrite(&write_addr, sizeof(u32), 1, trace_file);
++			fwrite(&write_size, sizeof(u32), 1, trace_file);
++			write_size = 0;
++		}
++	}
++}
++
++void VUTracer::onMemoryRead(u32 addr, u32 size) {
++	read_addr = addr;
++	read_size = size;
++}
++
++void VUTracer::onMemoryWrite(u32 addr, u32 size) {
++	write_addr = addr;
++	write_size = size;
++}
++
++void vutrace_log(const char* prefix, const char* fmt, ...) {
++	FILE* log_file = VUTracer::get().log_file;
++	if(log_file == nullptr) {
++		return;
++	}
++	
++	va_list args;
++	va_start(args, fmt);
++	fputs(prefix, log_file);
++	vfprintf(log_file, fmt, args);
++	fputc('\n', log_file);
++	va_end(args);
++}
++
++VUTracer& VUTracer::get() {
++	static VUTracer tracer;
++	return tracer;
++}
++
++void VUTracer::beginTraceSession() {
++	log_file = fopen("vutrace_output/LOG.txt", "wb");
++	if(log_file == nullptr) {
++		printf("[VUTrace] Fatal error: Cannot open log file for writing!\n");
++	}
++	
++	trace_index = -1;
++	beginTrace();
++}
++
++void VUTracer::endTraceSession() {
++	endTrace();
++	trace_index = -1;
++	fclose(log_file);
++	log_file = nullptr;
++	printf("[VUTrace] Trace session finished.\n");
++}
++
++void VUTracer::beginTrace() {
++	int local_trace_index = trace_index++;
++	
++	char file_name[128];
++	snprintf(file_name, 128, "vutrace_output/trace%06d.bin", local_trace_index);
++	printf("[VUTrace] Tracing to %s\n", file_name);
++	fprintf(log_file, "[VUTrace] ******************************** Tracing to %s ********************************\n", file_name);
++	trace_file = fopen(file_name, "wb");
++	if(trace_file == nullptr) {
++		printf("[VUTrace] Fatal error: Cannot open trace file!\n");
++	}
++	
++	// Write header.
++	fputc('V', trace_file);
++	fputc('U', trace_file);
++	fputc('T', trace_file);
++	fputc('R', trace_file);
++	int format_version = 3;
++	fwrite(&format_version, 4, 1, trace_file);
++}
++
++void VUTracer::endTrace() {
++	pushLastPacket();
++	fclose(trace_file);
++	has_output_instructions = false;
++	last_regs_populated = false;
++	last_memory_populated = false;
++}
++
++void VUTracer::pushLastPacket() {
++	if(ftell(trace_file) > 8) {
++		fputc(VUTRACE_PUSHSNAPSHOT, trace_file);
++	}
++}
+diff --git a/pcsx2/VUtracer.h b/pcsx2/VUtracer.h
+new file mode 100644
+index 000000000..ac9d333e3
+--- /dev/null
++++ b/pcsx2/VUtracer.h
+@@ -0,0 +1,79 @@
++/*
++	vutrace - Hacky VU tracer/debugger.
++	Copyright (C) 2022 chaoticgd
++
++	This program is free software: you can redistribute it and/or modify
++	it under the terms of the GNU General Public License as published by
++	the Free Software Foundation, either version 3 of the License, or
++	(at your option) any later version.
++
++	This program is distributed in the hope that it will be useful,
++	but WITHOUT ANY WARRANTY; without even the implied warranty of
++	MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++	GNU General Public License for more details.
++
++	You should have received a copy of the GNU General Public License
++	along with this program.  If not, see <https://www.gnu.org/licenses/>.
++*/
++
++#pragma once
++#include "MemoryTypes.h"
++#include "R5900.h"
++
++enum VUTracePacketType {
++	VUTRACE_NULLPACKET = 0,
++	VUTRACE_PUSHSNAPSHOT = 'P',
++	VUTRACE_SETREGISTERS = 'R',
++	VUTRACE_SETMEMORY = 'M',
++	VUTRACE_SETINSTRUCTIONS = 'I',
++	VUTRACE_LOADOP = 'L',
++	VUTRACE_STOREOP = 'S',
++	VUTRACE_PATCHREGISTER = 'r',
++	VUTRACE_PATCHMEMORY = 'm'
++};
++
++enum VUTraceStatus {
++	VUTRACESTATUS_DISABLED,
++	VUTRACESTATUS_WAITING, // We're waiting for vsync.
++	VUTRACESTATUS_TRACING
++};
++
++struct VURegs;
++class VUTracer {
++public:
++	VUTracer();
++	
++	void onTraceMenuItemClicked();
++	void onVsync();
++	void onVif1DmaSendChain(u32 tadr);
++	void onVifDmaTag(u32 madr, u64 dma_tag);
++	void onVu1ExecMicro(u32 pc);
++	void onInstructionExecuted(VURegs* regs);
++	void onMemoryRead(u32 addr, u32 size);
++	void onMemoryWrite(u32 addr, u32 size);
++	
++	static VUTracer& get();
++	
++	std::atomic<int> trace_index { -1 };
++	FILE* log_file = nullptr;
++private:
++	void beginTraceSession();
++	void endTraceSession();
++	void beginTrace();
++	void endTrace();
++	
++	void pushLastPacket();
++
++	VUTraceStatus status = VUTRACESTATUS_DISABLED;
++	
++	FILE* trace_file = nullptr;
++	bool has_output_instructions = false;
++	
++	u32 read_addr = 0, read_size = 0;
++	u32 write_addr = 0, write_size = 0;
++	
++	bool last_regs_populated = false;
++	VURegs* last_regs;
++	bool last_memory_populated = false;
++	u8 last_memory[16 * 1024];
++};
+diff --git a/pcsx2/Vif.cpp b/pcsx2/Vif.cpp
+index 00536be81..4b451f4d1 100644
+--- a/pcsx2/Vif.cpp
++++ b/pcsx2/Vif.cpp
+@@ -22,6 +22,7 @@
+ #include "Gif.h"
+ #include "MTVU.h"
+ #include "Gif_Unit.h"
++#include "DebugTools/Debug.h"
+ 
+ alignas(16) vifStruct vif0, vif1;
+ 
+diff --git a/pcsx2/Vif.h b/pcsx2/Vif.h
+index 6a6ab0b18..803513ec6 100644
+--- a/pcsx2/Vif.h
++++ b/pcsx2/Vif.h
+@@ -17,9 +17,12 @@
+ 
+ #include "MemoryTypes.h"
+ #include "R5900.h"
++#include "VUtracer.h"
+ 
+ #include "common/StringUtil.h"
+ 
++#include <atomic>
++
+ enum vif0_stat_flags
+ {
+ 	VIF0_STAT_VPS_W 	= (1),
+diff --git a/pcsx2/Vif1_Dma.cpp b/pcsx2/Vif1_Dma.cpp
+index b76b91e4d..895c66e4b 100644
+--- a/pcsx2/Vif1_Dma.cpp
++++ b/pcsx2/Vif1_Dma.cpp
+@@ -160,7 +160,9 @@ __fi void vif1SetupTransfer()
+ 
+ 	VIF_LOG("VIF1 Tag %8.8x_%8.8x size=%d, id=%d, madr=%lx, tadr=%lx",
+ 		ptag[1]._u32, ptag[0]._u32, vif1ch.qwc, ptag->ID, vif1ch.madr, vif1ch.tadr);
+-
++	
++	VUTracer::get().onVifDmaTag(vif1ch.madr, *(u64*) &ptag);
++	
+ 	if (!vif1.done && ((dmacRegs.ctrl.STD == STD_VIF1) && (ptag->ID == TAG_REFS))) // STD == VIF1
+ 	{
+ 		// there are still bugs, need to also check if gif->madr +16*qwc >= stadr, if not, stall
+@@ -479,7 +481,6 @@ void dmaVIF1()
+ 
+ 	if (vif1ch.qwc > 0) // Normal Mode
+ 	{
+-
+ 		// ignore tag if it's a GS download (Def Jam Fight for NY)
+ 		if (vif1ch.chcr.MOD == CHAIN_MODE && vif1ch.chcr.DIR)
+ 		{
+@@ -514,6 +515,8 @@ void dmaVIF1()
+ 	}
+ 	else
+ 	{
++		VUTracer::get().onVif1DmaSendChain(vif1ch.tadr);
++		
+ 		vif1.inprogress &= ~0x1;
+ 		vif1.dmamode = VIF_CHAIN_MODE;
+ 		vif1.done = false;
+diff --git a/pcsx2/Vif_Transfer.cpp b/pcsx2/Vif_Transfer.cpp
+index dede15658..2befa6cba 100644
+--- a/pcsx2/Vif_Transfer.cpp
++++ b/pcsx2/Vif_Transfer.cpp
+@@ -50,10 +50,10 @@ _vifT void vifTransferLoop(u32* &data) {
+ 
+ 
+ 			VIF_LOG("New VifCMD %x tagsize %x irq %d", vifX.cmd, vifX.tag.size, vifX.irq);
+-			if (IsDevBuild && SysTrace.EE.VIFcode.IsActive()) {
++			//if (IsDevBuild && SysTrace.EE.VIFcode.IsActive()) {
+ 				// Pass 2 means "log it"
+ 				vifCmdHandler[idx][vifX.cmd & 0x7f](2, data);
+-			}
++			//}
+ 		}
+ 
+ 		ret = vifCmdHandler[idx][vifX.cmd & 0x7f](vifX.pass, data);
+diff --git a/pcsx2/gui/App.h b/pcsx2/gui/App.h
+index 5aeb903d9..4c1a497a8 100644
+--- a/pcsx2/gui/App.h
++++ b/pcsx2/gui/App.h
+@@ -170,6 +170,7 @@ enum MenuIdentifiers
+ 	MenuId_Debug_Open, // opens the debugger window / starts a debug session
+ 	MenuId_Debug_MemoryDump,
+ 	MenuId_Debug_Logging, // dialog for selection additional log options
++	MenuId_Debug_VUTrace,
+ 	MenuId_Debug_CreateBlockdump,
+ 	MenuId_Config_ResetAll,
+ 
+diff --git a/pcsx2/gui/MainFrame.cpp b/pcsx2/gui/MainFrame.cpp
+index 11f024c9e..1c76faf37 100644
+--- a/pcsx2/gui/MainFrame.cpp
++++ b/pcsx2/gui/MainFrame.cpp
+@@ -304,6 +304,7 @@ void MainEmuFrame::ConnectMenus()
+ 
+ 	// Debug
+ 	Bind(wxEVT_MENU, &MainEmuFrame::Menu_Debug_Open_Click, this, MenuId_Debug_Open);
++	Bind(wxEVT_MENU, &MainEmuFrame::Menu_Debug_BeginVUTrace_Click, this, MenuId_Debug_VUTrace);
+ 
+ 	// Capture
+ 	Bind(wxEVT_MENU, &MainEmuFrame::Menu_Capture_Video_ToggleCapture_Click, this, MenuId_Capture_Video_Record);
+@@ -370,7 +371,11 @@ void MainEmuFrame::CreatePcsx2Menu()
+ 		_("For running raw PS2 binaries directly."));
+ 
+ 	m_menuSys.AppendSeparator();
+-
++	
++	m_menuSys.Append(MenuId_Debug_VUTrace,		_("Begin &VU trace..."),	wxEmptyString);
++	
++	m_menuSys.AppendSeparator();
++	
+ 	m_menuSys.Append(MenuId_Config_FastBoot, _("Fast Boot"),
+ 		_("Skips PS2 splash screens when booting from ISO or DVD media"), wxITEM_CHECK);
+ 
+diff --git a/pcsx2/gui/MainFrame.h b/pcsx2/gui/MainFrame.h
+index ba78ff684..8818ad85b 100644
+--- a/pcsx2/gui/MainFrame.h
++++ b/pcsx2/gui/MainFrame.h
+@@ -185,6 +185,7 @@ protected:
+ 	void Menu_Debug_Open_Click(wxCommandEvent& event);
+ 	void Menu_Debug_MemoryDump_Click(wxCommandEvent& event);
+ 	void Menu_Debug_CreateBlockdump_Click(wxCommandEvent& event);
++	void Menu_Debug_BeginVUTrace_Click(wxCommandEvent &event);
+ 	void Menu_Ask_On_Boot_Click(wxCommandEvent& event);
+ 
+ 	void Menu_ShowConsole(wxCommandEvent& event);
+diff --git a/pcsx2/gui/MainMenuClicks.cpp b/pcsx2/gui/MainMenuClicks.cpp
+index 265655cba..1cd9885af 100644
+--- a/pcsx2/gui/MainMenuClicks.cpp
++++ b/pcsx2/gui/MainMenuClicks.cpp
+@@ -901,6 +901,13 @@ void MainEmuFrame::Menu_Debug_MemoryDump_Click(wxCommandEvent& event)
+ {
+ }
+ 
++#include "Vif.h"
++
++void MainEmuFrame::Menu_Debug_BeginVUTrace_Click(wxCommandEvent &event)
++{
++	VUTracer::get().onTraceMenuItemClicked();
++}
++
+ void MainEmuFrame::Menu_ShowConsole(wxCommandEvent& event)
+ {
+ 	// Use messages to relay open/close commands (thread-safe)

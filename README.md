@@ -92,11 +92,11 @@ Stores a series of snapshots recording the state of VU1 over the course of an ex
 | - | - | - | - |
 | 0x0 | magic | u32 | Magic identifier. Equal to "VUTR" (big-endian). |
 | 0x4 | version | u32 | Format version number (as described above). |
-| 0x8 | packet 0 type | u8 | First packet type. |
-| 0x9 | packet 0 data | | First packet type. |
+| 0x8 | packet 0 type | u8 | Byte identifying the type of the first packet. |
+| 0x9 | packet 0 data | | Data stored for the first packet. |
 | ... | ...  | ... | ... |
-| | packet N-1 type  | u8 | First packet type. |
-| | packet N-1 data | | First packet type. |
+| | packet N-1 type  | u8 | Byte identifying the type of the last packet. |
+| | packet N-1 data | | Data stored for the last packet. |
 
 The last packet should be a `P` packet.
 

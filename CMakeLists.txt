@@ -1,6 +1,10 @@
 cmake_minimum_required(VERSION 3.0)
 project(vutrace)
 
+if(${CMAKE_SOURCE_DIR} STREQUAL ${CMAKE_BINARY_DIR})
+	message(FATAL_ERROR "In-tree build detected. You should do an out-of-tree build instead:\n\tcmake -S . -B bin/")
+endif()
+
 include_directories(imgui)
 add_definitions(-DIMGUI_IMPL_OPENGL_LOADER_GLAD=1)
 add_executable(vutrace

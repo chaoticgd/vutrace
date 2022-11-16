@@ -82,7 +82,7 @@ Stores a series of snapshots recording the state of VU1 over the course of an ex
 
 | Version | Notes |
 | - | - |
- 3 | Replaced the VURegs struct with a more well-defined data format. |
+ 3 | Replaced the VURegs struct with a more well-defined data format. Added `r` and `m` packet types. |
 | 2 | Introduced a file header (really high tech). Updated the VURegs struct to use 64-bit pointers. |
 | 1 | Initial version. |
 

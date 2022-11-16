@@ -363,12 +363,21 @@ void memory_window(AppState &app)
 		}
 	}
 	
+	static int row_size_imgui = 4;
+	static int row_size = 16;
 	ImGui::SameLine();
-    static int ROW_SIZE_IMGUI = 4;
-    static int ROW_SIZE = 16;
-    if (ImGui::SliderInt("ROWSIZE", &ROW_SIZE_IMGUI, 1, 16, "Bytes Per Row (4 bytes aligned): %d")) {
-        ROW_SIZE = ROW_SIZE_IMGUI * 4;
-    }
+	ImGui::PushItemWidth(100);
+	if(ImGui::SliderInt("##rowsize", &row_size_imgui, 1, 8, "Line Width: %d")) {
+		row_size = row_size_imgui * 4;
+	}
+	
+	ImGui::SameLine();
+	ImGui::PushItemWidth(100);
+	static std::string scroll_to_address_str;
+	s32 scroll_to_address = -1;
+	if(ImGui::InputText("Scroll To Address", &scroll_to_address_str)) {
+		scroll_to_address = strtol(scroll_to_address_str.c_str(), NULL, 16);
+	}
 	
 	ImGui::BeginChild("rows_outer");
 	if(ImGui::BeginChild("rows")) {
@@ -378,21 +387,21 @@ void memory_window(AppState &app)
 		ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(0, 0));
 		ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(18, 4));
 		
-		for(int i = 0; i < VU1_MEMSIZE / ROW_SIZE; i++) {
+		for(int i = 0; i < VU1_MEMSIZE / row_size; i++) {
 			ImGui::PushID(i);
 			
 			static ImColor row_header_col = ImColor(1.f, 1.f, 1.f);
 			std::stringstream row_header;
-			row_header << std::hex << std::setfill('0') << std::setw(5) << i * ROW_SIZE;
+			row_header << std::hex << std::setfill('0') << std::setw(5) << i * row_size;
 			ImGui::Text("%s", row_header.str().c_str());
 			ImGui::SameLine();
 			
-			for(int j = 0; j < ROW_SIZE / 4; j++) {
+			for(int j = 0; j < row_size / 4; j++) {
 				ImGui::PushID(j);
 				const auto draw_byte = [&](int k) {
 					ImGui::PushID(k);
 					
-					u32 address = i * ROW_SIZE + j * 4 + k;
+					u32 address = i * row_size + j * 4 + k;
 					u32 val = current.memory[address];
 					u32 last_val = last->memory[address];
 					std::stringstream hex;
@@ -409,7 +418,11 @@ void memory_window(AppState &app)
 					ImGui::SameLine();
 					ImGui::PopStyleColor();
 					
-					ImGui::PopID(); //k
+					if(address == scroll_to_address) {
+						ImGui::SetScrollHere(0.5);
+					}
+					
+					ImGui::PopID(); // k
 				};
 				
 				ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(6, 4));

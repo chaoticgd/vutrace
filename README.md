@@ -16,7 +16,7 @@ It should build on Linux (GCC) or Windows (MSVC) but has mainly been tested on L
 
 1. Checkout PCSX2 commit `e5bc1defa293524aa1da9cfbc568d5f986884801` and apply the patch `pcsx2_e5bc1defa293524aa1da9cfbc568d5f986884801.patch` to it using `git apply`, then build PCSX2.
 
-2. Build vutrace using cmake: `cmake . && cmake --build .`.
+2. Build vutrace using cmake: `cmake -S . -B bin/ && cmake --build bin/`.
 
 3. Launch PCSX2.
 

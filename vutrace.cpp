@@ -1,6 +1,6 @@
 /*
 	vutrace - Hacky VU tracer/debugger.
-	Copyright (C) 2020 chaoticgd
+	Copyright (C) 2022 chaoticgd
 
 	This program is free software: you can redistribute it and/or modify
 	it under the terms of the GNU General Public License as published by
@@ -42,10 +42,9 @@ static const int INSN_PAIR_SIZE = 8;
 
 struct Snapshot
 {
-	VURegs registers;
+	VURegs registers = {};
 	u8 memory[VU1_MEMSIZE];
 	u8 program[VU1_PROGSIZE];
-	int disassembly;
 	u32 read_addr = 0;
 	u32 read_size = 0;
 	u32 write_addr = 0;
@@ -364,12 +363,21 @@ void memory_window(AppState &app)
 		}
 	}
 	
+	static int row_size_imgui = 4;
+	static int row_size = 16;
 	ImGui::SameLine();
-    static int ROW_SIZE_IMGUI = 4;
-    static int ROW_SIZE = 16;
-    if (ImGui::SliderInt("ROWSIZE", &ROW_SIZE_IMGUI, 1, 16, "Bytes Per Row (4 bytes aligned): %d")) {
-        ROW_SIZE = ROW_SIZE_IMGUI * 4;
-    }
+	ImGui::PushItemWidth(100);
+	if(ImGui::SliderInt("##rowsize", &row_size_imgui, 1, 8, "Line Width: %d")) {
+		row_size = row_size_imgui * 4;
+	}
+	
+	ImGui::SameLine();
+	ImGui::PushItemWidth(100);
+	static std::string scroll_to_address_str;
+	s32 scroll_to_address = -1;
+	if(ImGui::InputText("Scroll To Address", &scroll_to_address_str)) {
+		scroll_to_address = strtol(scroll_to_address_str.c_str(), NULL, 16);
+	}
 	
 	ImGui::BeginChild("rows_outer");
 	if(ImGui::BeginChild("rows")) {
@@ -379,21 +387,21 @@ void memory_window(AppState &app)
 		ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(0, 0));
 		ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(18, 4));
 		
-		for(int i = 0; i < VU1_MEMSIZE / ROW_SIZE; i++) {
+		for(int i = 0; i < VU1_MEMSIZE / row_size; i++) {
 			ImGui::PushID(i);
 			
 			static ImColor row_header_col = ImColor(1.f, 1.f, 1.f);
 			std::stringstream row_header;
-			row_header << std::hex << std::setfill('0') << std::setw(5) << i * ROW_SIZE;
+			row_header << std::hex << std::setfill('0') << std::setw(5) << i * row_size;
 			ImGui::Text("%s", row_header.str().c_str());
 			ImGui::SameLine();
 			
-			for(int j = 0; j < ROW_SIZE / 4; j++) {
+			for(int j = 0; j < row_size / 4; j++) {
 				ImGui::PushID(j);
 				const auto draw_byte = [&](int k) {
 					ImGui::PushID(k);
 					
-					u32 address = i * ROW_SIZE + j * 4 + k;
+					u32 address = i * row_size + j * 4 + k;
 					u32 val = current.memory[address];
 					u32 last_val = last->memory[address];
 					std::stringstream hex;
@@ -410,7 +418,11 @@ void memory_window(AppState &app)
 					ImGui::SameLine();
 					ImGui::PopStyleColor();
 					
-					ImGui::PopID(); //k
+					if(address == scroll_to_address) {
+						ImGui::SetScrollHere(0.5);
+					}
+					
+					ImGui::PopID(); // k
 				};
 				
 				ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(6, 4));
@@ -696,13 +708,15 @@ void walk_until_mem_access(AppState &app, u32 address)
 }
 
 enum VUTracePacketType {
-	DEFAULT = 0,
-	VUTRACE_PUSHSNAPSHOT = 'P', // Next packet directly follows.
-	VUTRACE_SETREGISTERS = 'R', // VURegs struct follows (32-bit pointers).
-	VUTRACE_SETMEMORY = 'M', // 16k memory follows.
-	VUTRACE_SETINSTRUCTIONS = 'I', // 16k micromem follows.
-	VUTRACE_LOADOP = 'L', // u32 address, u32 size follows.
-	VUTRACE_STOREOP = 'S' // u32 address, u32 size follows.
+	VUTRACE_NULLPACKET = 0,
+	VUTRACE_PUSHSNAPSHOT = 'P',
+	VUTRACE_SETREGISTERS = 'R',
+	VUTRACE_SETMEMORY = 'M',
+	VUTRACE_SETINSTRUCTIONS = 'I',
+	VUTRACE_LOADOP = 'L',
+	VUTRACE_STOREOP = 'S',
+	VUTRACE_PATCHREGISTER = 'r',
+	VUTRACE_PATCHMEMORY = 'm'
 };
 
 void parse_trace(AppState &app, std::string trace_file_path)
@@ -738,13 +752,13 @@ void parse_trace(AppState &app, std::string trace_file_path)
 		fseek(trace, 0, SEEK_SET);
 	}
 	
-	if(version > 2) {
+	if(version > 3) {
 		fprintf(stderr, "Format version too new!\n");
 		exit(1);
 	}
 	
 	Snapshot current;
-	VUTracePacketType packet_type = DEFAULT;
+	VUTracePacketType packet_type = VUTRACE_NULLPACKET;
 	while(fread(&packet_type, 1, 1, trace) == 1) {
 		switch(packet_type) {
 			case VUTRACE_PUSHSNAPSHOT: {
@@ -771,38 +785,89 @@ void parse_trace(AppState &app, std::string trace_file_path)
 				current.write_size = 0;
 				break;
 			}
-			case VUTRACE_SETREGISTERS:
+			case VUTRACE_SETREGISTERS: {
 				if(version == 1) {
-					old_pcsx2_structs::VURegs old_regs;
+					old_pcsx2_structs_v1::VURegs old_regs = {};
 					check_eof(fread(&old_regs, sizeof(old_regs), 1, trace));
-					current.registers = {};
+					memcpy(current.registers.VF, old_regs.VF, sizeof(current.registers.VF));
+					memcpy(current.registers.VI, old_regs.VI, sizeof(current.registers.VI));
+					current.registers.ACC = old_regs.ACC;
+					current.registers.q = old_regs.q;
+					current.registers.p = old_regs.p;
+				} else if(version == 2) {
+					old_pcsx2_structs_v2::VURegs old_regs = {};
+					check_eof(fread(&old_regs, sizeof(old_regs), 1, trace));
 					memcpy(current.registers.VF, old_regs.VF, sizeof(current.registers.VF));
 					memcpy(current.registers.VI, old_regs.VI, sizeof(current.registers.VI));
 					current.registers.ACC = old_regs.ACC;
 					current.registers.q = old_regs.q;
 					current.registers.p = old_regs.p;
 				} else {
-					check_eof(fread(&current.registers, sizeof(VURegs), 1, trace));
+					check_eof(fread(&current.registers.VF, sizeof(current.registers.VF), 1, trace));
+					check_eof(fread(&current.registers.VI, sizeof(current.registers.VI), 1, trace));
+					check_eof(fread(&current.registers.ACC, sizeof(current.registers.ACC), 1, trace));
+					check_eof(fread(&current.registers.q, sizeof(current.registers.q), 1, trace));
+					check_eof(fread(&current.registers.p, sizeof(current.registers.p), 1, trace));
 				}
 				break;
-			case VUTRACE_SETMEMORY:
+			}
+			case VUTRACE_SETMEMORY: {
 				check_eof(fread(current.memory, VU1_MEMSIZE, 1, trace));
 				break;
-			case VUTRACE_SETINSTRUCTIONS:
+			}
+			case VUTRACE_SETINSTRUCTIONS: {
 				check_eof(fread(current.program, VU1_PROGSIZE, 1, trace));
 				break;
-			case VUTRACE_LOADOP:
+			}
+			case VUTRACE_LOADOP: {
 				check_eof(fread(&current.read_addr, sizeof(u32), 1, trace));
 				check_eof(fread(&current.read_size, sizeof(u32), 1, trace));
 				break;
-			case VUTRACE_STOREOP:
+			}
+			case VUTRACE_STOREOP: {
 				check_eof(fread(&current.write_addr, sizeof(u32), 1, trace));
 				check_eof(fread(&current.write_size, sizeof(u32), 1, trace));
 				break;
-			default:
+			}
+			case VUTRACE_PATCHREGISTER: {
+				u8 index = 0;
+				u128 data = {};
+				check_eof(fread(&index, sizeof(u8), 1, trace));
+				check_eof(fread(&data, sizeof(u128), 1, trace));
+				if(index < 32) {
+					memcpy(&current.registers.VF[index], &data, 16);
+				} else if(index < 64) {
+					memcpy(&current.registers.VI[index - 32], &data, 16);
+				} else if(index == 64) {
+					memcpy(&current.registers.ACC, &data, 16);
+				} else if(index == 65) {
+					memcpy(&current.registers.q, &data, 16);
+				} else if(index == 66) {
+					memcpy(&current.registers.p, &data, 16);
+				} else {
+					fprintf(stderr, "Error: 'r' packet has bad register index.\n");
+					exit(1);
+				}
+				break;
+			}
+			case VUTRACE_PATCHMEMORY: {
+				u16 address = 0;
+				u32 data = 0;
+				check_eof(fread(&address, sizeof(u16), 1, trace));
+				check_eof(fread(&data, sizeof(u32), 1, trace));
+				if(address < VU1_MEMSIZE - 4) {
+					memcpy(&current.memory[address], &data, sizeof(data));
+				} else {
+					fprintf(stderr, "Error: 'm' packet has address that is too big.\n");
+					exit(1);
+				}
+				break;
+			}
+			default: {
 				fprintf(stderr, "Error: Invalid packet type 0x%x in trace file at 0x%lx!\n",
 					packet_type, ftell(trace));
 				exit(1);
+			}
 		}
 	}
 	if(!feof(trace)) {

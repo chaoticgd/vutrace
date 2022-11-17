@@ -292,13 +292,13 @@ index 0c3541931..c778be63b 100644
  	if (_Z) { ptr[4] = VU->VI[_It_].US[0]; ptr[5] = 0; }
 diff --git a/pcsx2/VUtracer.cpp b/pcsx2/VUtracer.cpp
 new file mode 100644
-index 000000000..f2564894b
+index 000000000..46b6a3ed4
 --- /dev/null
 +++ b/pcsx2/VUtracer.cpp
 @@ -0,0 +1,249 @@
 +/*
 +	vutrace - Hacky VU tracer/debugger.
-+	Copyright (C) 2022 chaoticgd
++	Copyright (C) 2020-2022 chaoticgd
 +
 +	This program is free software: you can redistribute it and/or modify
 +	it under the terms of the GNU General Public License as published by
@@ -547,13 +547,13 @@ index 000000000..f2564894b
 +}
 diff --git a/pcsx2/VUtracer.h b/pcsx2/VUtracer.h
 new file mode 100644
-index 000000000..ac9d333e3
+index 000000000..13da875e9
 --- /dev/null
 +++ b/pcsx2/VUtracer.h
 @@ -0,0 +1,79 @@
 +/*
 +	vutrace - Hacky VU tracer/debugger.
-+	Copyright (C) 2022 chaoticgd
++	Copyright (C) 2020-2022 chaoticgd
 +
 +	This program is free software: you can redistribute it and/or modify
 +	it under the terms of the GNU General Public License as published by

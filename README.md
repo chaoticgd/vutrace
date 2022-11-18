@@ -82,7 +82,7 @@ Stores a series of snapshots recording the state of VU1 over the course of an ex
 
 | Version | Notes |
 | - | - |
- 3 | Replaced the VURegs struct with a more well-defined data format. Added `r` and `m` packet types. |
+| 3 | Replaced the VURegs struct with a more well-defined data format. Added `r` and `m` packet types. |
 | 2 | Introduced a file header (really high tech). Updated the VURegs struct to use 64-bit pointers. |
 | 1 | Initial version. |
 
@@ -104,7 +104,7 @@ The last packet should be a `P` packet.
 
 ##### `P`
 
-Push the current snapshot. The parser maintains a single snapshot as the current state and appends it the snapshot list when this packet is encountered. No data.
+Push the current snapshot. The parser maintains a single snapshot as the current state and appends it to the snapshot list when this packet is encountered. No data.
 
 ##### `R`
 

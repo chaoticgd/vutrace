@@ -58,6 +58,11 @@ where `vu0MicroMem.bin` or `vu1MicroMem.bin` can be extracted from a PCSX2 save 
 
 ## Recent Changelog
 
+### 2022-11-21
+
+- Added an option to filter the snapshot list by whether a snapshot is highlighted.
+- Fixed an out of bounds memory access for specially crafted trace files.
+
 ### 2022-11-16
 
 - Created version 3 of the trace file format, which drastically reduces file sizes by only storing registers and sections of memory that were modified.

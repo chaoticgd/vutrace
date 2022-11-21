@@ -219,6 +219,16 @@ void snapshots_window(AppState &app)
 			};
 			ImGui::EndTabItem();
 		}
+		if(ImGui::BeginTabItem("Highlighted")) {
+			filter = [&](Snapshot &snapshot) {
+				std::string disassembly = disassemble(&snapshot.program[snapshot.registers.VI[TPC].SL], snapshot.registers.VI[TPC].SL);
+				bool is_highlighted =
+					app.disassembly_highlight.size() > 0 &&
+					disassembly.find(app.disassembly_highlight) != std::string::npos;
+				return is_highlighted;
+			};
+			ImGui::EndTabItem();
+		}
 		ImGui::EndTabBar();
 	}
 	

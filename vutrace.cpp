@@ -762,6 +762,10 @@ void parse_trace(AppState &app, std::string trace_file_path)
 	while(fread(&packet_type, 1, 1, trace) == 1) {
 		switch(packet_type) {
 			case VUTRACE_PUSHSNAPSHOT: {
+				if(current.registers.VI[TPC].UL >= VU1_PROGSIZE || current.registers.VI[TPC].UL % INSN_PAIR_SIZE != 0) {
+					fprintf(stderr, "Bad program counter value.\n");
+					exit(1);
+				}
 				app.snapshots.push_back(current);
 				
 				u32 pc = current.registers.VI[TPC].UL;

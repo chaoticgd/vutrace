@@ -158,7 +158,7 @@ Patch the registers of the current snapshot. Data format:
 | Offset | Name | Type | Descriptions |
 | - | - | - | - |
 | 0x0 | index | u8 | The register index. The `R` data above is treated as a single array of registers. |
-| 0x2 | data | u128 | The contents of the register. |
+| 0x1 | data | u128 | The contents of the register. |
 
 ##### `m` (since v3)
 

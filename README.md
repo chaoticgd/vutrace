@@ -6,7 +6,7 @@ This is useful for reversing the renderers and model formats of PS2 games.
 
 It should build on Linux (GCC) or Windows (MSVC) but has mainly been tested on Linux.
 
-**The patch was last updated on 2022-11-16. The traces are no longer huge and trace sessions will actually start and stop on vsync!**
+**The patch was last updated on 2023-01-02.**
 
 ## Screenshot
 
@@ -57,6 +57,11 @@ where `vu0MicroMem.bin` or `vu1MicroMem.bin` can be extracted from a PCSX2 save 
 - patch: The framebuffer dumps aren't synced with the VU state dumps.
 
 ## Recent Changelog
+
+## 2023-01-02
+
+- Updated the patch so VUtracer.cpp is registered in the VS project (not just the CMake project).
+- Improved error handling when the `vutrace_output` directory doesn't exist.
 
 ### 2022-11-21
 

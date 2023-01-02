@@ -292,13 +292,13 @@ index 0c3541931..c778be63b 100644
  	if (_Z) { ptr[4] = VU->VI[_It_].US[0]; ptr[5] = 0; }
 diff --git a/pcsx2/VUtracer.cpp b/pcsx2/VUtracer.cpp
 new file mode 100644
-index 000000000..46b6a3ed4
+index 000000000..63e545921
 --- /dev/null
 +++ b/pcsx2/VUtracer.cpp
-@@ -0,0 +1,249 @@
+@@ -0,0 +1,251 @@
 +/*
 +	vutrace - Hacky VU tracer/debugger.
-+	Copyright (C) 2020-2022 chaoticgd
++	Copyright (C) 2020-2023 chaoticgd
 +
 +	This program is free software: you can redistribute it and/or modify
 +	it under the terms of the GNU General Public License as published by
@@ -497,6 +497,8 @@ index 000000000..46b6a3ed4
 +	log_file = fopen("vutrace_output/LOG.txt", "wb");
 +	if(log_file == nullptr) {
 +		printf("[VUTrace] Fatal error: Cannot open log file for writing!\n");
++		status = VUTRACESTATUS_DISABLED;
++		return;
 +	}
 +	
 +	trace_index = -1;
@@ -547,13 +549,13 @@ index 000000000..46b6a3ed4
 +}
 diff --git a/pcsx2/VUtracer.h b/pcsx2/VUtracer.h
 new file mode 100644
-index 000000000..13da875e9
+index 000000000..3b831d28d
 --- /dev/null
 +++ b/pcsx2/VUtracer.h
 @@ -0,0 +1,79 @@
 +/*
 +	vutrace - Hacky VU tracer/debugger.
-+	Copyright (C) 2020-2022 chaoticgd
++	Copyright (C) 2020-2023 chaoticgd
 +
 +	This program is free software: you can redistribute it and/or modify
 +	it under the terms of the GNU General Public License as published by
@@ -775,3 +777,54 @@ index 265655cba..1cd9885af 100644
  void MainEmuFrame::Menu_ShowConsole(wxCommandEvent& event)
  {
  	// Use messages to relay open/close commands (thread-safe)
+diff --git a/pcsx2/pcsx2.vcxproj b/pcsx2/pcsx2.vcxproj
+index 58a35bd06..ad791c580 100644
+--- a/pcsx2/pcsx2.vcxproj
++++ b/pcsx2/pcsx2.vcxproj
+@@ -555,6 +555,7 @@
+     <ClCompile Include="GS\Renderers\Common\GSVertexTrace.cpp" />
+     <ClCompile Include="Dump.cpp" />
+     <ClCompile Include="Pcsx2Config.cpp" />
++    <ClCompile Include="VUtracer.cpp" />
+     <ClCompile Include="windows\FlatFileReaderWindows.cpp" />
+     <ClCompile Include="Darwin\DarwinFlatFileReader.cpp">
+       <ExcludedFromBuild>true</ExcludedFromBuild>
+@@ -1042,6 +1043,7 @@
+     <ClInclude Include="MTVU.h" />
+     <ClInclude Include="VU.h" />
+     <ClInclude Include="VUmicro.h" />
++    <ClInclude Include="VUtracer.h" />
+     <ClInclude Include="x86\iR5900Analysis.h" />
+     <ClInclude Include="x86\microVU.h" />
+     <ClInclude Include="x86\microVU_IR.h" />
+diff --git a/pcsx2/pcsx2.vcxproj.filters b/pcsx2/pcsx2.vcxproj.filters
+index 4fe048270..9c08c4977 100644
+--- a/pcsx2/pcsx2.vcxproj.filters
++++ b/pcsx2/pcsx2.vcxproj.filters
+@@ -1799,6 +1799,9 @@
+     <ClCompile Include="Frontend\ImGuiOverlays.cpp">
+       <Filter>Host</Filter>
+     </ClCompile>
++    <ClCompile Include="VUtracer.cpp">
++      <Filter>System\Ps2\EmotionEngine\VU</Filter>
++    </ClCompile>
+   </ItemGroup>
+   <ItemGroup>
+     <ClInclude Include="Patch.h">
+@@ -2999,6 +3002,9 @@
+     <ClInclude Include="ShaderCacheVersion.h">
+       <Filter>System\Include</Filter>
+     </ClInclude>
++    <ClInclude Include="VUtracer.h">
++      <Filter>System\Ps2\EmotionEngine\VU</Filter>
++    </ClInclude>
+   </ItemGroup>
+   <ItemGroup>
+     <ResourceCompile Include="windows\wxResources.rc">
+@@ -3161,4 +3167,4 @@
+       <Filter>AppHost\Resources</Filter>
+     </Manifest>
+   </ItemGroup>
+-</Project>
++</Project>
+\ No newline at end of file

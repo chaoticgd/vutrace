@@ -303,11 +303,9 @@ void registers_window(AppState &app)
 	
 	static bool show_as_hex = false;
 
-    ImGui::BeginTable("float register", 2, ImGuiTableFlags_SizingStretchProp | ImGuiTableFlags_BordersInnerV | ImGuiTableFlags_BordersInnerH | ImGuiTableFlags_Resizable);
-
-    ImGui::TableNextRow();
-    ImGui::TableSetColumnIndex(0);
     ImGui::Checkbox("Show as Hex", &show_as_hex);
+
+    ImGui::BeginTable("float register", 2, ImGuiTableFlags_SizingStretchProp | ImGuiTableFlags_BordersInnerV | ImGuiTableFlags_BordersInnerH | ImGuiTableFlags_Resizable);
 
     for(int i = 0; i < 32; i++) {
         VECTOR value = regs.VF[i];

@@ -31,8 +31,8 @@
 #include <imgui.h>
 #include <imgui_internal.h>
 #include <misc/cpp/imgui_stdlib.h>
-#include <examples/imgui_impl_glfw.h>
-#include <examples/imgui_impl_opengl3.h>
+#include <backends/imgui_impl_glfw.h>
+#include <backends/imgui_impl_opengl3.h>
 
 #include "pcsx2defs.h"
 #include "pcsx2disassemble.h"
@@ -129,22 +129,22 @@ int main(int argc, char **argv)
 		ImGui::NewFrame();
 		
 		if(g.InputTextState.ID == 0 || g.InputTextState.ID != ImGui::GetActiveID()) {
-			if(ImGui::IsKeyPressed('W') && app.current_snapshot > 0) {
+			if(ImGui::IsKeyPressed(ImGuiKey_W) && app.current_snapshot > 0) {
 				app.current_snapshot--;
 				app.snapshots_scroll_to = true;
 				app.disassembly_scroll_to = true;
 			}
-			if(ImGui::IsKeyPressed('S') && app.current_snapshot < app.snapshots.size() - 1) {
+			if(ImGui::IsKeyPressed(ImGuiKey_S) && app.current_snapshot < app.snapshots.size() - 1) {
 				app.current_snapshot++;
 				app.snapshots_scroll_to = true;
 				app.disassembly_scroll_to = true;
 			}
 			
 			u32 pc = app.snapshots[app.current_snapshot].registers.VI[TPC].UL;
-			if(ImGui::IsKeyPressed('A')) {
+			if(ImGui::IsKeyPressed(ImGuiKey_A)) {
 				walk_until_pc_equal(app, pc, -1);
 			}
-			if(ImGui::IsKeyPressed('D')) {
+			if(ImGui::IsKeyPressed(ImGuiKey_D)) {
 				walk_until_pc_equal(app, pc, 1);
 			}
 		}
@@ -236,7 +236,7 @@ void snapshots_window(AppState &app)
 	size.x -= 16;
 	size.y -= 82;
 	ImGui::PushItemWidth(-1);
-	if(ImGui::ListBoxHeader("##snapshots", size)) {
+	if(ImGui::BeginListBox("##snapshots", size)) {
 		for(std::size_t i = 0; i < app.snapshots.size(); i++) {
 			Snapshot& snap = app.snapshots[i];
 			Snapshot next_snap;
@@ -276,11 +276,11 @@ void snapshots_window(AppState &app)
 			}
 			
 			if(app.snapshots_scroll_to && is_selected) {
-				ImGui::SetScrollHere(0.5);
+				ImGui::SetScrollHereY(0.5);
 				app.snapshots_scroll_to = false;
 			}
 		}
-		ImGui::ListBoxFooter();
+		ImGui::EndListBox();
 	}
 	ImGui::PopItemWidth();
 }
@@ -289,47 +289,56 @@ void registers_window(AppState &app)
 {
 	Snapshot &current = app.snapshots[app.current_snapshot];
 	VURegs &regs = current.registers;
+
+    static const char *integer_register_names[] = {
+            "vi00", "vi01", "vi02", "vi03",
+            "vi04", "vi05", "vi06", "vi07",
+            "vi08", "vi09", "vi10", "vi11",
+            "vi12", "vi13", "vi14", "vi15",
+            "Status", "MACflag", "ClipFlag", "c2c19",
+            "R", "I", "Q", "c2c23",
+            "c2c24", "c2c25", "TPC", "CMSAR0",
+            "FBRST", "VPU-STAT", "c2c30", "CMSAR1",
+    };
 	
 	static bool show_as_hex = false;
-	
-	ImGui::Columns(2);
-		ImGui::Checkbox("Show as Hex", &show_as_hex);
-	
-		for(int i = 0; i < 32; i++) {
-			VECTOR value = regs.VF[i];
-			if(show_as_hex) {
-				ImGui::Text("vf%02d = %08x %08x %08x %08x",
-					i, value.UL[0], value.UL[1], value.UL[2], value.UL[3]);
-			} else {
-				ImGui::Text("vf%02d = %.4f %.4f %.4f %.4f",
-					i, value.F[0], value.F[1], value.F[2], value.F[3]);
-			}
-		}
-		if(show_as_hex) {
-			ImGui::Text("ACC = %08x %08x %08x %08x",
-				regs.ACC.F[0], regs.ACC.F[1], regs.ACC.F[2], regs.ACC.F[3]);
-		} else {
-			ImGui::Text("ACC = %.4f %.4f %.4f %.4f",
-				regs.ACC.F[0], regs.ACC.F[1], regs.ACC.F[2], regs.ACC.F[3]);
-		}
-	ImGui::NextColumn();
-	ImGui::SetColumnWidth(1, 192);
-	ImGui::SetColumnOffset(1, ImGui::GetWindowSize().x - 192);
-		static const char *integer_register_names[] = {
-			"vi00", "vi01", "vi02", "vi03",
-			"vi04", "vi05", "vi06", "vi07",
-			"vi08", "vi09", "vi10", "vi11",
-			"vi12", "vi13", "vi14", "vi15",
-			"Status", "MACflag", "ClipFlag", "c2c19",
-			"R", "I", "Q", "c2c23",
-			"c2c24", "c2c25", "TPC", "CMSAR0",
-			"FBRST", "VPU-STAT", "c2c30", "CMSAR1",
-		};
-	
-		for(int i = 0; i < 32; i++) {
-			ImGui::Text("%s = 0x%x = %hd", integer_register_names[i], regs.VI[i].UL, regs.VI[i].UL);
-		}
-	ImGui::Columns(1);
+
+    ImGui::BeginTable("float register", 2, ImGuiTableFlags_SizingStretchProp | ImGuiTableFlags_BordersInnerV | ImGuiTableFlags_BordersInnerH | ImGuiTableFlags_Resizable);
+
+    ImGui::TableNextRow();
+    ImGui::TableSetColumnIndex(0);
+    ImGui::Checkbox("Show as Hex", &show_as_hex);
+
+    for(int i = 0; i < 32; i++) {
+        VECTOR value = regs.VF[i];
+        ImGui::TableNextRow();
+        ImGui::TableSetColumnIndex(0);
+
+        if(show_as_hex) {
+            ImGui::Text("vf%02d = %08x %08x %08x %08x",
+                        i, value.UL[0], value.UL[1], value.UL[2], value.UL[3]);
+        } else {
+            ImGui::Text("vf%02d = %.4f %.4f %.4f %.4f",
+                        i, value.F[0], value.F[1], value.F[2], value.F[3]);
+        }
+
+        ImGui::TableSetColumnIndex(1);
+
+        ImGui::Text("%s = 0x%x = %hd", integer_register_names[i], regs.VI[i].UL, regs.VI[i].UL);
+    }
+
+    ImGui::TableNextRow();
+    ImGui::TableSetColumnIndex(0);
+    if(show_as_hex) {
+        ImGui::Text("ACC = %08x %08x %08x %08x",
+                    regs.ACC.F[0], regs.ACC.F[1], regs.ACC.F[2], regs.ACC.F[3]);
+    } else {
+        ImGui::Text("ACC = %.4f %.4f %.4f %.4f",
+                    regs.ACC.F[0], regs.ACC.F[1], regs.ACC.F[2], regs.ACC.F[3]);
+    }
+
+    ImGui::EndTable();
+
 }
 
 void memory_window(AppState &app)
@@ -392,25 +401,25 @@ void memory_window(AppState &app)
 	ImGui::BeginChild("rows_outer");
 	if(ImGui::BeginChild("rows")) {
 		ImDrawList *dl = ImGui::GetWindowDrawList();
-		
+
 		ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.f, 0.f, 0.f, 0.f));
 		ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(0, 0));
 		ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(18, 4));
-		
+
 		for(int i = 0; i < VU1_MEMSIZE / row_size; i++) {
 			ImGui::PushID(i);
-			
+
 			static ImColor row_header_col = ImColor(1.f, 1.f, 1.f);
 			std::stringstream row_header;
 			row_header << std::hex << std::setfill('0') << std::setw(5) << i * row_size;
 			ImGui::Text("%s", row_header.str().c_str());
 			ImGui::SameLine();
-			
+
 			for(int j = 0; j < row_size / 4; j++) {
 				ImGui::PushID(j);
 				const auto draw_byte = [&](int k) {
 					ImGui::PushID(k);
-					
+
 					u32 address = i * row_size + j * 4 + k;
 					u32 val = current.memory[address];
 					u32 last_val = last->memory[address];
@@ -427,14 +436,14 @@ void memory_window(AppState &app)
 					}
 					ImGui::SameLine();
 					ImGui::PopStyleColor();
-					
+
 					if(address == scroll_to_address) {
-						ImGui::SetScrollHere(0.5);
+						ImGui::SetScrollHereY(0.5);
 					}
-					
+
 					ImGui::PopID(); // k
 				};
-				
+
 				ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(6, 4));
 				draw_byte(0);
 				draw_byte(1);
@@ -444,16 +453,15 @@ void memory_window(AppState &app)
 				ImGui::PopID(); // j
 			}
 			ImGui::NewLine();
-			
+
 			ImGui::PopID(); // i
 		}
-		
+
 		ImGui::PopStyleColor();
 		ImGui::PopStyleVar();
 		ImGui::PopStyleVar();
-		
-		ImGui::EndChild();
 	}
+    ImGui::EndChild();
 	ImGui::EndChild();
 }
 
@@ -533,7 +541,7 @@ void disassembly_window(AppState &app)
 		}
 		
 		if(is_pc && app.disassembly_scroll_to) {
-			ImGui::SetScrollHere(0.5);
+			ImGui::SetScrollHereY(0.5);
 			app.disassembly_scroll_to = false;
 		}
 		
@@ -948,6 +956,7 @@ void init_gui(GLFWwindow **window)
 	io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;
 	io.ConfigFlags |= ImGuiConfigFlags_DockingEnable;
 	io.ConfigDockingWithShift = true;
+    io.FontAllowUserScaling = true;
 	ImGui::StyleColorsDark();
 	ImGui_ImplGlfw_InitForOpenGL(*window, true);
 	ImGui_ImplOpenGL3_Init("#version 120");

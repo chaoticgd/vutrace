@@ -436,7 +436,7 @@ void memory_window(AppState &app)
                     ImGui::PopStyleColor();
 
                     if(address == scroll_to_address) {
-                        ImGui::SetScrollHere(0.5);
+                        ImGui::SetScrollHereY(0.5);
                     }
 
                     ImGui::PopID(); // k

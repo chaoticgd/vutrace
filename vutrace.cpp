@@ -341,126 +341,126 @@ void registers_window(AppState &app)
 
 void memory_window(AppState &app)
 {
-	Snapshot &current = app.snapshots[app.current_snapshot];
-	Snapshot *last;
-	if(app.current_snapshot > 0) {
-		last = &app.snapshots[app.current_snapshot - 1];
-	} else {
-		last = &current;
-	}
-	
-	static MessageBoxState found_bytes;
-	alert(found_bytes, "Found Bytes");
-	
-	static MessageBoxState find_bytes;
-	if(prompt(find_bytes, "Find Bytes") && !found_bytes.is_open) {
-		std::vector<u8> value_raw = decode_hex(find_bytes.text);
-		for(std::size_t i = 0; i < VU1_MEMSIZE - value_raw.size(); i++) {
-			if(memcmp(value_raw.data(), &current.memory[i], value_raw.size()) == 0) {
-				found_bytes.is_open = true;
-				found_bytes.text = "Found match at 0x" + to_hex(i);
-				break;
-			}
-		}
-		if(!found_bytes.is_open) {
-			found_bytes.is_open = true;
-			found_bytes.text = "No match found";
-		}
-	}
-	
-	ImGui::SameLine();
-	static MessageBoxState save_to_file;
-	if(prompt(save_to_file, "Save to File")) {
-		FILE* dump_file = fopen(save_to_file.text.c_str(), "wb");
-		if(dump_file) {
-			fwrite(&current.memory[0], sizeof(current.memory), 1, dump_file);
-			fclose(dump_file);
-		} else {
-			fprintf(stderr, "Failed to open %s for writing.\n", save_to_file.text.c_str());
-		}
-	}
-	
-	static int row_size_imgui = 4;
-	static int row_size = 16;
-	ImGui::SameLine();
-	ImGui::PushItemWidth(100);
-	if(ImGui::SliderInt("##rowsize", &row_size_imgui, 1, 8, "Line Width: %d")) {
-		row_size = row_size_imgui * 4;
-	}
-	
-	ImGui::SameLine();
-	ImGui::PushItemWidth(100);
-	static std::string scroll_to_address_str;
-	s32 scroll_to_address = -1;
-	if(ImGui::InputText("Scroll To Address", &scroll_to_address_str)) {
-		scroll_to_address = strtol(scroll_to_address_str.c_str(), NULL, 16);
-	}
-	
-	ImGui::BeginChild("rows_outer");
-	if(ImGui::BeginChild("rows")) {
-		ImDrawList *dl = ImGui::GetWindowDrawList();
-        
-		ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.f, 0.f, 0.f, 0.f));
-		ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(0, 0));
-		ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(18, 4));
-        
-		for(int i = 0; i < VU1_MEMSIZE / row_size; i++) {
-			ImGui::PushID(i);
-            
-			static ImColor row_header_col = ImColor(1.f, 1.f, 1.f);
-			std::stringstream row_header;
-			row_header << std::hex << std::setfill('0') << std::setw(5) << i * row_size;
-			ImGui::Text("%s", row_header.str().c_str());
-			ImGui::SameLine();
-            
-			for(int j = 0; j < row_size / 4; j++) {
-				ImGui::PushID(j);
-				const auto draw_byte = [&](int k) {
-					ImGui::PushID(k);
-                    
-					u32 address = i * row_size + j * 4 + k;
-					u32 val = current.memory[address];
-					u32 last_val = last->memory[address];
-					std::stringstream hex;
-					if(val < 0x10) hex << "0";
-					hex << std::hex << val;
-					ImVec4 hex_col = ImVec4(0.8f, 0.8f, 0.8f, 1.f);
-					if(val != last_val) {
-						hex_col = ImVec4(1.f, 0.5f, 0.5f, 1.f);
-					}
-					ImGui::PushStyleColor(ImGuiCol_Text, hex_col);
-					if(ImGui::Button(hex.str().c_str())) {
-						walk_until_mem_access(app, address);
-					}
-					ImGui::SameLine();
-					ImGui::PopStyleColor();
-                    
-					if(address == scroll_to_address) {
-						ImGui::SetScrollHereY(0.5);
-					}
-                    
-					ImGui::PopID(); // k
-				};
-                
-				ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(6, 4));
-				draw_byte(0);
-				draw_byte(1);
-				draw_byte(2);
-				ImGui::PopStyleVar();
-				draw_byte(3);
-				ImGui::PopID(); // j
-			}
-			ImGui::NewLine();
-            
-			ImGui::PopID(); // i
-		}
-        
-		ImGui::PopStyleColor();
-		ImGui::PopStyleVar();
-		ImGui::PopStyleVar();
-	}
+    Snapshot &current = app.snapshots[app.current_snapshot];
+    Snapshot *last;
+    if(app.current_snapshot > 0) {
+        last = &app.snapshots[app.current_snapshot - 1];
+    } else {
+        last = &current;
+    }
+
+    static MessageBoxState found_bytes;
+    alert(found_bytes, "Found Bytes");
+
+    static MessageBoxState find_bytes;
+    if(prompt(find_bytes, "Find Bytes") && !found_bytes.is_open) {
+        std::vector<u8> value_raw = decode_hex(find_bytes.text);
+        for(std::size_t i = 0; i < VU1_MEMSIZE - value_raw.size(); i++) {
+            if(memcmp(value_raw.data(), &current.memory[i], value_raw.size()) == 0) {
+                found_bytes.is_open = true;
+                found_bytes.text = "Found match at 0x" + to_hex(i);
+                break;
+            }
+        }
+        if(!found_bytes.is_open) {
+            found_bytes.is_open = true;
+            found_bytes.text = "No match found";
+        }
+    }
+
+    ImGui::SameLine();
+    static MessageBoxState save_to_file;
+    if(prompt(save_to_file, "Save to File")) {
+        FILE* dump_file = fopen(save_to_file.text.c_str(), "wb");
+        if(dump_file) {
+            fwrite(&current.memory[0], sizeof(current.memory), 1, dump_file);
+            fclose(dump_file);
+        } else {
+            fprintf(stderr, "Failed to open %s for writing.\n", save_to_file.text.c_str());
+        }
+    }
+
+    static int row_size_imgui = 4;
+    static int row_size = 16;
+    ImGui::SameLine();
+    ImGui::PushItemWidth(100);
+    if(ImGui::SliderInt("##rowsize", &row_size_imgui, 1, 8, "Line Width: %d")) {
+        row_size = row_size_imgui * 4;
+    }
+
+    ImGui::SameLine();
+    ImGui::PushItemWidth(100);
+    static std::string scroll_to_address_str;
+    s32 scroll_to_address = -1;
+    if(ImGui::InputText("Scroll To Address", &scroll_to_address_str)) {
+        scroll_to_address = strtol(scroll_to_address_str.c_str(), NULL, 16);
+    }
+
+    ImGui::BeginChild("rows_outer");
+    if(ImGui::BeginChild("rows")) {
+        ImDrawList *dl = ImGui::GetWindowDrawList();
+
+        ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.f, 0.f, 0.f, 0.f));
+        ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(0, 0));
+        ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(18, 4));
+
+        for(int i = 0; i < VU1_MEMSIZE / row_size; i++) {
+            ImGui::PushID(i);
+
+            static ImColor row_header_col = ImColor(1.f, 1.f, 1.f);
+            std::stringstream row_header;
+            row_header << std::hex << std::setfill('0') << std::setw(5) << i * row_size;
+            ImGui::Text("%s", row_header.str().c_str());
+            ImGui::SameLine();
+
+            for(int j = 0; j < row_size / 4; j++) {
+                ImGui::PushID(j);
+                const auto draw_byte = [&](int k) {
+                    ImGui::PushID(k);
+
+                    u32 address = i * row_size + j * 4 + k;
+                    u32 val = current.memory[address];
+                    u32 last_val = last->memory[address];
+                    std::stringstream hex;
+                    if(val < 0x10) hex << "0";
+                    hex << std::hex << val;
+                    ImVec4 hex_col = ImVec4(0.8f, 0.8f, 0.8f, 1.f);
+                    if(val != last_val) {
+                        hex_col = ImVec4(1.f, 0.5f, 0.5f, 1.f);
+                    }
+                    ImGui::PushStyleColor(ImGuiCol_Text, hex_col);
+                    if(ImGui::Button(hex.str().c_str())) {
+                        walk_until_mem_access(app, address);
+                    }
+                    ImGui::SameLine();
+                    ImGui::PopStyleColor();
+
+                    if(address == scroll_to_address) {
+                        ImGui::SetScrollHere(0.5);
+                    }
+
+                    ImGui::PopID(); // k
+                };
+
+                ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(6, 4));
+                draw_byte(0);
+                draw_byte(1);
+                draw_byte(2);
+                ImGui::PopStyleVar();
+                draw_byte(3);
+                ImGui::PopID(); // j
+            }
+            ImGui::NewLine();
+
+            ImGui::PopID(); // i
+        }
+
+        ImGui::PopStyleColor();
+        ImGui::PopStyleVar();
+        ImGui::PopStyleVar();
+    }
     ImGui::EndChild();
-	ImGui::EndChild();
+    ImGui::EndChild();
 }
 
 void disassembly_window(AppState &app)

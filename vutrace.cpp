@@ -399,25 +399,25 @@ void memory_window(AppState &app)
 	ImGui::BeginChild("rows_outer");
 	if(ImGui::BeginChild("rows")) {
 		ImDrawList *dl = ImGui::GetWindowDrawList();
-
+        
 		ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.f, 0.f, 0.f, 0.f));
 		ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(0, 0));
 		ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(18, 4));
-
+        
 		for(int i = 0; i < VU1_MEMSIZE / row_size; i++) {
 			ImGui::PushID(i);
-
+            
 			static ImColor row_header_col = ImColor(1.f, 1.f, 1.f);
 			std::stringstream row_header;
 			row_header << std::hex << std::setfill('0') << std::setw(5) << i * row_size;
 			ImGui::Text("%s", row_header.str().c_str());
 			ImGui::SameLine();
-
+            
 			for(int j = 0; j < row_size / 4; j++) {
 				ImGui::PushID(j);
 				const auto draw_byte = [&](int k) {
 					ImGui::PushID(k);
-
+                    
 					u32 address = i * row_size + j * 4 + k;
 					u32 val = current.memory[address];
 					u32 last_val = last->memory[address];
@@ -434,14 +434,14 @@ void memory_window(AppState &app)
 					}
 					ImGui::SameLine();
 					ImGui::PopStyleColor();
-
+                    
 					if(address == scroll_to_address) {
 						ImGui::SetScrollHereY(0.5);
 					}
-
+                    
 					ImGui::PopID(); // k
 				};
-
+                
 				ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(6, 4));
 				draw_byte(0);
 				draw_byte(1);
@@ -451,10 +451,10 @@ void memory_window(AppState &app)
 				ImGui::PopID(); // j
 			}
 			ImGui::NewLine();
-
+            
 			ImGui::PopID(); // i
 		}
-
+        
 		ImGui::PopStyleColor();
 		ImGui::PopStyleVar();
 		ImGui::PopStyleVar();

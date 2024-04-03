@@ -2,4 +2,5 @@
 	path = glfw
 	url = https://github.com/glfw/glfw
 [submodule "imgui"]
+	path = imgui
 	url = https://github.com/ocornut/imgui

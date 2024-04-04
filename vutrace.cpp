@@ -450,9 +450,8 @@ void memory_window(AppState &app)
 		ImGui::PopStyleColor();
 		ImGui::PopStyleVar();
 		ImGui::PopStyleVar();
-		
-		ImGui::EndChild();
 	}
+	ImGui::EndChild();
 	ImGui::EndChild();
 }
 

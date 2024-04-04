@@ -31,8 +31,8 @@
 #include <imgui.h>
 #include <imgui_internal.h>
 #include <misc/cpp/imgui_stdlib.h>
-#include <examples/imgui_impl_glfw.h>
-#include <examples/imgui_impl_opengl3.h>
+#include <backends/imgui_impl_glfw.h>
+#include <backends/imgui_impl_opengl3.h>
 
 #include "pcsx2defs.h"
 #include "pcsx2disassemble.h"
@@ -129,22 +129,22 @@ int main(int argc, char **argv)
 		ImGui::NewFrame();
 		
 		if(g.InputTextState.ID == 0 || g.InputTextState.ID != ImGui::GetActiveID()) {
-			if(ImGui::IsKeyPressed('W') && app.current_snapshot > 0) {
+			if(ImGui::IsKeyPressed(ImGuiKey_W) && app.current_snapshot > 0) {
 				app.current_snapshot--;
 				app.snapshots_scroll_to = true;
 				app.disassembly_scroll_to = true;
 			}
-			if(ImGui::IsKeyPressed('S') && app.current_snapshot < app.snapshots.size() - 1) {
+			if(ImGui::IsKeyPressed(ImGuiKey_S) && app.current_snapshot < app.snapshots.size() - 1) {
 				app.current_snapshot++;
 				app.snapshots_scroll_to = true;
 				app.disassembly_scroll_to = true;
 			}
 			
 			u32 pc = app.snapshots[app.current_snapshot].registers.VI[TPC].UL;
-			if(ImGui::IsKeyPressed('A')) {
+			if(ImGui::IsKeyPressed(ImGuiKey_A)) {
 				walk_until_pc_equal(app, pc, -1);
 			}
-			if(ImGui::IsKeyPressed('D')) {
+			if(ImGui::IsKeyPressed(ImGuiKey_D)) {
 				walk_until_pc_equal(app, pc, 1);
 			}
 		}
@@ -236,7 +236,7 @@ void snapshots_window(AppState &app)
 	size.x -= 16;
 	size.y -= 82;
 	ImGui::PushItemWidth(-1);
-	if(ImGui::ListBoxHeader("##snapshots", size)) {
+	if(ImGui::BeginListBox("##snapshots", size)) {
 		for(std::size_t i = 0; i < app.snapshots.size(); i++) {
 			Snapshot& snap = app.snapshots[i];
 			Snapshot next_snap;
@@ -276,11 +276,11 @@ void snapshots_window(AppState &app)
 			}
 			
 			if(app.snapshots_scroll_to && is_selected) {
-				ImGui::SetScrollHere(0.5);
+				ImGui::SetScrollHereY(0.5);
 				app.snapshots_scroll_to = false;
 			}
 		}
-		ImGui::ListBoxFooter();
+		ImGui::EndListBox();
 	}
 	ImGui::PopItemWidth();
 }
@@ -314,7 +314,6 @@ void registers_window(AppState &app)
 		}
 	ImGui::NextColumn();
 	ImGui::SetColumnWidth(1, 192);
-	ImGui::SetColumnOffset(1, ImGui::GetWindowSize().x - 192);
 		static const char *integer_register_names[] = {
 			"vi00", "vi01", "vi02", "vi03",
 			"vi04", "vi05", "vi06", "vi07",
@@ -429,7 +428,7 @@ void memory_window(AppState &app)
 					ImGui::PopStyleColor();
 					
 					if(address == scroll_to_address) {
-						ImGui::SetScrollHere(0.5);
+						ImGui::SetScrollHereY(0.5);
 					}
 					
 					ImGui::PopID(); // k
@@ -533,7 +532,7 @@ void disassembly_window(AppState &app)
 		}
 		
 		if(is_pc && app.disassembly_scroll_to) {
-			ImGui::SetScrollHere(0.5);
+			ImGui::SetScrollHereY(0.5);
 			app.disassembly_scroll_to = false;
 		}
 		

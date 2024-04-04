@@ -9,13 +9,13 @@ include_directories(imgui)
 add_definitions(-DIMGUI_IMPL_OPENGL_LOADER_GLAD=1)
 add_executable(vutrace
 	vutrace.cpp
-	imgui/imconfig.h
+	imgui/imgui.cpp
 	imgui/imgui_demo.cpp
 	imgui/imgui_draw.cpp
+	imgui/imgui_tables.cpp
 	imgui/imgui_widgets.cpp
-	imgui/imgui.cpp
-	imgui/examples/imgui_impl_glfw.cpp
-	imgui/examples/imgui_impl_opengl3.cpp
+	imgui/backends/imgui_impl_glfw.cpp
+	imgui/backends/imgui_impl_opengl3.cpp
 	imgui/misc/cpp/imgui_stdlib.cpp
 )
 

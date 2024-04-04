@@ -307,7 +307,7 @@ void registers_window(AppState &app)
 		}
 		if(show_as_hex) {
 			ImGui::Text("ACC = %08x %08x %08x %08x",
-				regs.ACC.F[0], regs.ACC.F[1], regs.ACC.F[2], regs.ACC.F[3]);
+				regs.ACC.UL[0], regs.ACC.UL[1], regs.ACC.UL[2], regs.ACC.UL[3]);
 		} else {
 			ImGui::Text("ACC = %.4f %.4f %.4f %.4f",
 				regs.ACC.F[0], regs.ACC.F[1], regs.ACC.F[2], regs.ACC.F[3]);

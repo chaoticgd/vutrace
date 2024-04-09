@@ -4,6 +4,3 @@
 [submodule "glfw"]
 	path = glfw
 	url = https://github.com/glfw/glfw
-[submodule "filedialog"]
-	path = filedialog
-	url = https://github.com/aiekick/ImGuiFileDialog

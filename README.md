@@ -58,6 +58,10 @@ where `vu0MicroMem.bin` or `vu1MicroMem.bin` can be extracted from a PCSX2 save 
 
 ## Recent Changelog
 
+### 2024-04-04
+
+- Updated dependencies.
+
 ### 2023-01-02
 
 - Updated the patch so VUtracer.cpp is registered in the VS project (not just the CMake project).

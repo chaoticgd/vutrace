@@ -42,6 +42,7 @@
 static const int INSN_PAIR_SIZE = 8;
 static int row_size_imgui = 4;
 static int row_size = 16;
+static int tick_rate = 1;
 static bool show_as_hex = false;
 
 struct Snapshot
@@ -942,7 +943,7 @@ void init_gui(GLFWwindow **window)
 
 	glfwMaximizeWindow(*window);
 	glfwMakeContextCurrent(*window);
-	int tick_rate = glfwGetVideoMode(glfwGetPrimaryMonitor())->refreshRate / 60;
+	tick_rate = glfwGetVideoMode(glfwGetPrimaryMonitor())->refreshRate / 60;
 	glfwSwapInterval(tick_rate); // vsync
 
 	if(!gladLoadGLLoader((GLADloadproc) glfwGetProcAddress)) {
@@ -977,6 +978,12 @@ void main_menu_bar() {
             }
             if(ImGui::MenuItem("Export Disassembly", "Ctrl+D")) {
                 export_box.is_open = true;
+            }
+            ImGui::EndMenu();
+        }
+        if(ImGui::BeginMenu("System")) {
+            if(ImGui::SliderInt("##tickrate", &tick_rate, 0, 5, "Tick Rate %d")) {
+                glfwSwapInterval(tick_rate);
             }
             ImGui::EndMenu();
         }

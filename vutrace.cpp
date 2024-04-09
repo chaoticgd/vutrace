@@ -93,6 +93,7 @@ void save_comment_file(AppState &app);
 std::string disassemble(u8 *program, u32 address);
 bool is_xgkick(u32 lower);
 void init_gui(GLFWwindow **window);
+void main_menu_bar(AppState &app);
 void begin_docking();
 void create_dock_layout(GLFWwindow *window);
 void alert(MessageBoxState &state, const char *title);
@@ -148,6 +149,8 @@ int main(int argc, char **argv)
 				walk_until_pc_equal(app, pc, 1);
 			}
 		}
+        
+        main_menu_bar(app);
 
 		begin_docking();
 		update_gui(app);
@@ -285,50 +288,56 @@ void snapshots_window(AppState &app)
 	ImGui::PopItemWidth();
 }
 
-void registers_window(AppState &app)
-{
-	Snapshot &current = app.snapshots[app.current_snapshot];
-	VURegs &regs = current.registers;
-	
-	static bool show_as_hex = false;
-	
-	ImGui::Columns(2);
-		ImGui::Checkbox("Show as Hex", &show_as_hex);
-	
-		for(int i = 0; i < 32; i++) {
-			VECTOR value = regs.VF[i];
-			if(show_as_hex) {
-				ImGui::Text("vf%02d = %08x %08x %08x %08x",
-					i, value.UL[0], value.UL[1], value.UL[2], value.UL[3]);
-			} else {
-				ImGui::Text("vf%02d = %.4f %.4f %.4f %.4f",
-					i, value.F[0], value.F[1], value.F[2], value.F[3]);
-			}
-		}
-		if(show_as_hex) {
-			ImGui::Text("ACC = %08x %08x %08x %08x",
-				regs.ACC.UL[0], regs.ACC.UL[1], regs.ACC.UL[2], regs.ACC.UL[3]);
-		} else {
-			ImGui::Text("ACC = %.4f %.4f %.4f %.4f",
-				regs.ACC.F[0], regs.ACC.F[1], regs.ACC.F[2], regs.ACC.F[3]);
-		}
-	ImGui::NextColumn();
-	ImGui::SetColumnWidth(1, 192);
-		static const char *integer_register_names[] = {
-			"vi00", "vi01", "vi02", "vi03",
-			"vi04", "vi05", "vi06", "vi07",
-			"vi08", "vi09", "vi10", "vi11",
-			"vi12", "vi13", "vi14", "vi15",
-			"Status", "MACflag", "ClipFlag", "c2c19",
-			"R", "I", "Q", "c2c23",
-			"c2c24", "c2c25", "TPC", "CMSAR0",
-			"FBRST", "VPU-STAT", "c2c30", "CMSAR1",
-		};
-	
-		for(int i = 0; i < 32; i++) {
-			ImGui::Text("%s = 0x%x = %hd", integer_register_names[i], regs.VI[i].UL, regs.VI[i].UL);
-		}
-	ImGui::Columns(1);
+void registers_window(AppState &app) {
+    Snapshot &current = app.snapshots[app.current_snapshot];
+    VURegs &regs = current.registers;
+
+    static bool show_as_hex = false;
+    static const char *integer_register_names[] = {
+            "vi00", "vi01", "vi02", "vi03",
+            "vi04", "vi05", "vi06", "vi07",
+            "vi08", "vi09", "vi10", "vi11",
+            "vi12", "vi13", "vi14", "vi15",
+            "Status", "MACflag", "ClipFlag", "c2c19",
+            "R", "I", "Q", "c2c23",
+            "c2c24", "c2c25", "TPC", "CMSAR0",
+            "FBRST", "VPU-STAT", "c2c30", "CMSAR1",
+    };
+
+    ImGui::Checkbox("Show as Hex", &show_as_hex);
+
+    ImGui::BeginTable("Registers", 2, ImGuiTableFlags_SizingStretchProp | ImGuiTableFlags_BordersInnerV |
+                                           ImGuiTableFlags_BordersInnerH | ImGuiTableFlags_Resizable);
+
+    for (int i = 0; i < 32; i++) {
+        VECTOR value = regs.VF[i];
+        ImGui::TableNextRow();
+        ImGui::TableSetColumnIndex(0);
+
+        if (show_as_hex) {
+            ImGui::Text("vf%02d = %08x %08x %08x %08x",
+                        i, value.UL[0], value.UL[1], value.UL[2], value.UL[3]);
+        } else {
+            ImGui::Text("vf%02d = %.4f %.4f %.4f %.4f",
+                        i, value.F[0], value.F[1], value.F[2], value.F[3]);
+        }
+
+        ImGui::TableSetColumnIndex(1);
+
+        ImGui::Text("%s = 0x%x = %hd", integer_register_names[i], regs.VI[i].UL, regs.VI[i].UL);
+    }
+
+    ImGui::TableNextRow();
+    ImGui::TableSetColumnIndex(0);
+    if (show_as_hex) {
+        ImGui::Text("ACC = %08x %08x %08x %08x",
+                    regs.ACC.F[0], regs.ACC.F[1], regs.ACC.F[2], regs.ACC.F[3]);
+    } else {
+        ImGui::Text("ACC = %.4f %.4f %.4f %.4f",
+                    regs.ACC.F[0], regs.ACC.F[1], regs.ACC.F[2], regs.ACC.F[3]);
+    }
+
+    ImGui::EndTable();
 }
 
 void memory_window(AppState &app)
@@ -459,29 +468,10 @@ void disassembly_window(AppState &app)
 {
 	Snapshot &current = app.snapshots[app.current_snapshot];
 	
-	ImGui::PushItemWidth(ImGui::GetWindowWidth() - 363);
+	ImGui::PushItemWidth(ImGui::GetWindowWidth() - (ImGui::GetWindowWidth() * .75f));
 	ImGui::InputText("Highlight", &app.disassembly_highlight);
 	ImGui::PopItemWidth();
 	ImGui::SameLine();
-	
-	static MessageBoxState export_box;
-	if(prompt(export_box, "Export Disassembly")) {
-		std::ofstream disassembly_out_file(export_box.text);
-		for(std::size_t i = 0; i < VU1_PROGSIZE; i+= INSN_PAIR_SIZE) {
-			disassembly_out_file << disassemble(&current.program[i], i);
-			if(app.comments.at(i / INSN_PAIR_SIZE).size() > 0) {
-				disassembly_out_file << "; ";
-			}
-			disassembly_out_file << app.comments.at(i / INSN_PAIR_SIZE);
-			disassembly_out_file << "\n";
-		}
-	}
-	
-	ImGui::SameLine();
-	static MessageBoxState comment_box;
-	if(prompt(comment_box, "Load Comment File")) {
-		parse_comment_file(app, comment_box.text);
-	}
 	
 	ImGui::BeginChild("disasm");
 	ImGui::Columns(2);
@@ -943,12 +933,61 @@ void init_gui(GLFWwindow **window)
 	IMGUI_CHECKVERSION();
 	ImGui::CreateContext();
 	ImGuiIO &io = ImGui::GetIO();
+
+    io.Fonts->AddFontFromFileTTF("ProggyVector-Regular.ttf", 20.0f);
+    
+    io.FontGlobalScale = 1.0f;
+    
 	io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;
 	io.ConfigFlags |= ImGuiConfigFlags_DockingEnable;
 	io.ConfigDockingWithShift = true;
+    io.FontAllowUserScaling = true;
 	ImGui::StyleColorsDark();
+    
+    io.Fonts->Build();
 	ImGui_ImplGlfw_InitForOpenGL(*window, true);
 	ImGui_ImplOpenGL3_Init("#version 120");
+}
+
+void main_menu_bar(AppState &app) {
+    Snapshot &current = app.snapshots[app.current_snapshot];
+    static MessageBoxState export_box;
+    static MessageBoxState comment_box;
+    
+    if (ImGui::BeginMainMenuBar()) {
+        if(ImGui::BeginMenu("File")) {
+            if(ImGui::MenuItem("Save", "Ctrl+S")) {            
+            }
+            if(ImGui::MenuItem("Load Comment File", "Ctrl+L")) {
+                if(prompt(comment_box, "Load Comment File")) {
+                    parse_comment_file(app, comment_box.text);
+                }
+            }
+            if(ImGui::MenuItem("Export Disassembly", "Ctrl+D")) {
+                if(prompt(export_box, "Export Disassembly")) {
+                    std::ofstream disassembly_out_file(export_box.text);
+                    for(std::size_t i = 0; i < VU1_PROGSIZE; i+= INSN_PAIR_SIZE) {
+                        disassembly_out_file << disassemble(&current.program[i], i);
+                        if(app.comments.at(i / INSN_PAIR_SIZE).size() > 0) {
+                            disassembly_out_file << "; ";
+                        }
+                        disassembly_out_file << app.comments.at(i / INSN_PAIR_SIZE);
+                        disassembly_out_file << "\n";
+                    }
+                }
+            }
+            ImGui::EndMenu();
+        }
+        
+        if(ImGui::BeginMenu("Font")) {
+            if(ImGui::SliderFloat("Size", &ImGui::GetIO().FontGlobalScale, 0.1f, 2.0f, "%.1f")) {
+            }
+            ImGui::EndMenu();
+        }
+        
+        
+        ImGui::EndMainMenuBar();
+    }
 }
 
 void begin_docking() {

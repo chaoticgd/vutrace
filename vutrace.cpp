@@ -87,6 +87,8 @@ static MessageBoxState export_box;
 static MessageBoxState comment_box;
 static MessageBoxState save_to_file;
 static MessageBoxState find_bytes;
+static MessageBoxState go_to_box;
+std::vector<std::string> disasm_instructions;
 
 void update_gui(AppState &app);
 void snapshots_window(AppState &app);
@@ -384,14 +386,14 @@ void memory_window(AppState &app)
 			fprintf(stderr, "Failed to open %s for writing.\n", save_to_file.text.c_str());
 		}
 	}
-	
-	ImGui::SameLine();
-	ImGui::PushItemWidth(100);
+    
 	static std::string scroll_to_address_str;
 	s32 scroll_to_address = -1;
-	if(ImGui::InputText("Scroll To Address", &scroll_to_address_str)) {
-		scroll_to_address = strtol(scroll_to_address_str.c_str(), NULL, 16);
-	}
+
+    if(prompt(go_to_box, "Scroll To Address"))
+    {
+        scroll_to_address = strtol(go_to_box.text.c_str(), NULL, 16);
+    }
 	
 	ImGui::BeginChild("rows_outer");
 	if(ImGui::BeginChild("rows")) {
@@ -499,7 +501,7 @@ void disassembly_window(AppState &app)
                                      ImGuiSelectableFlags_None :
                                      ImGuiSelectableFlags_Disabled;
 
-        std::string disassembly = disassemble(&current.program[i], i);
+        std::string disassembly = disasm_instructions[i >> 3]; 
 
         if(instruction.branch_from_times.size() > 0) {
             std::stringstream addresses;
@@ -891,6 +893,10 @@ void parse_trace(AppState &app, std::string trace_file_path)
 	}
 	
 	fclose(trace);
+
+    for(std::size_t i = 0; i < VU1_PROGSIZE; i += INSN_PAIR_SIZE) {
+        disasm_instructions.push_back(disassemble(&current.program[i], i));
+    }    
 }
 
 void parse_comment_file(AppState &app, std::string comment_file_path) {
@@ -936,7 +942,8 @@ void init_gui(GLFWwindow **window)
 
 	glfwMaximizeWindow(*window);
 	glfwMakeContextCurrent(*window);
-	glfwSwapInterval(1); // vsync
+	int tick_rate = glfwGetVideoMode(glfwGetPrimaryMonitor())->refreshRate / 60;
+	glfwSwapInterval(tick_rate); // vsync
 
 	if(!gladLoadGLLoader((GLADloadproc) glfwGetProcAddress)) {
 		fprintf(stderr, "Cannot load GLAD.");
@@ -965,8 +972,6 @@ void main_menu_bar() {
     
     if (ImGui::BeginMainMenuBar()) {
         if(ImGui::BeginMenu("File")) {
-            if(ImGui::MenuItem("Save", "Ctrl+S")) {            
-            }
             if(ImGui::MenuItem("Load Comments", "Ctrl+L")) {
                 comment_box.is_open = true;
             }
@@ -989,7 +994,7 @@ void main_menu_bar() {
                 save_to_file.is_open = true;
             }
             if(ImGui::MenuItem("Go To", "Ctrl+G")) {
-                find_bytes.is_open = true;
+                go_to_box.is_open = true;
             }
             if(ImGui::SliderInt("##rowsize", &row_size_imgui, 1, 8, "Line Width: %d")) {
                 row_size = row_size_imgui * 4;
@@ -1021,7 +1026,7 @@ void handle_shortcuts() {
             comment_box.is_open = !comment_box.is_open;
         }
         if(ImGui::IsKeyPressed(ImGuiKey_G)) {
-            comment_box.is_open = !comment_box.is_open;
+            go_to_box.is_open = !go_to_box.is_open;
         }
         if(ImGui::IsKeyPressed(ImGuiKey_Q)) {
             show_as_hex = !show_as_hex;
@@ -1100,14 +1105,14 @@ bool prompt(MessageBoxState &state, const char *title)
 	bool result = false;
     if(state.is_open) {
 		ImGui::SetNextWindowSize(ImVec2(400, 100));
-		ImGui::Begin(title);
-		ImGui::InputText("##input", &state.text);
-		if(ImGui::Button("Okay")) {
+		ImGui::Begin(title, &state.is_open);
+        ImGui::InputText("##input", &state.text, ImGuiInputTextFlags_AutoSelectAll);
+		if(ImGui::Button("Okay") || ImGui::IsKeyPressed(ImGuiKey_Enter)) {
 			state.is_open = false;
 			result = true;
 		}
 		ImGui::SameLine();
-		if(ImGui::Button("Cancel")) {
+		if(ImGui::Button("Cancel")  || ImGui::IsKeyPressed(ImGuiKey_Escape)) {
 			state.is_open = false;
 		}
 		ImGui::End();

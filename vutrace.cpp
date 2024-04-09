@@ -483,102 +483,105 @@ void disassembly_window(AppState &app)
             disassembly_out_file << "\n";
         }
     }
-    
-	ImGui::BeginChild("disasm");
-	ImGui::Columns(2);
-	ImGui::SetColumnWidth(0, ImGui::GetWindowWidth() - (ImGui::GetWindowWidth() * .25f));
-	
-	for(std::size_t i = 0; i < VU1_PROGSIZE; i += INSN_PAIR_SIZE) {
-		ImGui::PushID(i);
-		
-		Instruction instruction = app.instructions[i / INSN_PAIR_SIZE];
-		bool is_pc = current.registers.VI[TPC].UL == i;
-		ImGuiSelectableFlags flags = instruction.is_executed ?
-			ImGuiSelectableFlags_None :
-			ImGuiSelectableFlags_Disabled;
-		
-		std::string disassembly = disassemble(&current.program[i], i);
-		
-		if(instruction.branch_from_times.size() > 0) {
-			std::stringstream addresses;
-			std::size_t fallthrough_times = app.instructions[i / 8 + 1].times_executed;
-			for(auto addrtimes = instruction.branch_from_times.begin(); addrtimes != instruction.branch_from_times.end(); addrtimes++) {
-				addresses << std::hex << addrtimes->first << " (" << std::dec << addrtimes->second << ") ";
-				fallthrough_times -= addrtimes->second;
-			} 
-			ImGui::Text("  %s/ ft (%ld) ->", addresses.str().c_str(), fallthrough_times);
-		}
-		
-		bool is_highlighted =
-			app.disassembly_highlight.size() > 0 &&
-			disassembly.find(app.disassembly_highlight) != std::string::npos;
-		
-		if(is_highlighted) {
-			ImGui::PushStyleColor(ImGuiCol_Text, ImColor(255, 255, 0).Value);
-		}
-		bool clicked = ImGui::Selectable(disassembly.c_str(), is_pc, flags);
-		if(is_highlighted) {
-			ImGui::PopStyleColor();
-		}
-		
-		if(instruction.branch_to_times.size() > 0) {
-			std::stringstream addresses;
-			std::size_t fallthrough_times = instruction.times_executed;
-			for(auto addrtimes = instruction.branch_to_times.begin(); addrtimes != instruction.branch_to_times.end(); addrtimes++) {
-				addresses << std::hex << addrtimes->first << " (" << std::dec << addrtimes->second << ") ";
-				fallthrough_times -= addrtimes->second;
-			} 
-			ImGui::Text("  -> %s/ ft (%ld)", addresses.str().c_str(), fallthrough_times);
-		}
-		
-		if(is_pc && app.disassembly_scroll_to) {
-			ImGui::SetScrollHereY(0.5);
-			app.disassembly_scroll_to = false;
-		}
-		
-		if(!is_pc && clicked) {
-			bool pc_changed = false;
-			if(current.registers.VI[TPC].UL > i) {
-				pc_changed = walk_until_pc_equal(app, i, -1);
-				if(!pc_changed) {
-					pc_changed = walk_until_pc_equal(app, i, 1);
-				}
-			} else {
-				pc_changed = walk_until_pc_equal(app, i, 1);
-				if(!pc_changed) {
-					pc_changed = walk_until_pc_equal(app, i, -1);
-				}
-			}
-			if(pc_changed) {
-				app.disassembly_scroll_to = true;
-			}
-		}
-		
-		ImGui::NextColumn();
-		if(!is_pc) {
-			ImGui::PushStyleColor(ImGuiCol_FrameBg, ImVec4(0.f, 0.f, 0.f, 0.f));
-		}
-		ImVec2 comment_size(ImGui::GetWindowSize().x - 768.f, 14.f);
-		std::string &comment = app.comments.at(i / INSN_PAIR_SIZE);
-		ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(0, 0));
-		ImGui::PushItemWidth(-1);
-		ImGuiInputTextFlags comment_flags = app.comments_loaded ?
-			ImGuiInputTextFlags_None :
-			ImGuiInputTextFlags_ReadOnly;
-		if(ImGui::InputText("##comment", &comment, comment_flags)) {
-			save_comment_file(app);
-		}
-		ImGui::PopItemWidth();
-		ImGui::PopStyleVar();
-		if(!is_pc) {
-			ImGui::PopStyleColor();
-		}
-		ImGui::NextColumn();
-		
-		ImGui::PopID();
-	}
-	
-	ImGui::Columns();
+
+    ImGui::BeginChild("disasm");
+
+    ImGui::BeginTable("Instructions", 2, ImGuiTableFlags_SizingStretchProp | ImGuiTableFlags_BordersInnerV |
+                                      ImGuiTableFlags_BordersInnerH | ImGuiTableFlags_Resizable);
+
+    for(std::size_t i = 0; i < VU1_PROGSIZE; i += INSN_PAIR_SIZE) {
+        ImGui::TableNextRow();
+        ImGui::TableSetColumnIndex(0);
+        ImGui::PushID(i);
+
+        Instruction instruction = app.instructions[i / INSN_PAIR_SIZE];
+        bool is_pc = current.registers.VI[TPC].UL == i;
+        ImGuiSelectableFlags flags = instruction.is_executed ?
+                                     ImGuiSelectableFlags_None :
+                                     ImGuiSelectableFlags_Disabled;
+
+        std::string disassembly = disassemble(&current.program[i], i);
+
+        if(instruction.branch_from_times.size() > 0) {
+            std::stringstream addresses;
+            std::size_t fallthrough_times = app.instructions[i / 8 + 1].times_executed;
+            for(auto addrtimes = instruction.branch_from_times.begin(); addrtimes != instruction.branch_from_times.end(); addrtimes++) {
+                addresses << std::hex << addrtimes->first << " (" << std::dec << addrtimes->second << ") ";
+                fallthrough_times -= addrtimes->second;
+            }
+            ImGui::Text("  %s/ ft (%ld) ->", addresses.str().c_str(), fallthrough_times);
+        }
+
+        bool is_highlighted =
+                app.disassembly_highlight.size() > 0 &&
+                disassembly.find(app.disassembly_highlight) != std::string::npos;
+
+        if(is_highlighted) {
+            ImGui::PushStyleColor(ImGuiCol_Text, ImColor(255, 255, 0).Value);
+        }
+        bool clicked = ImGui::Selectable(disassembly.c_str(), is_pc, flags);
+        if(is_highlighted) {
+            ImGui::PopStyleColor();
+        }
+
+        if(instruction.branch_to_times.size() > 0) {
+            std::stringstream addresses;
+            std::size_t fallthrough_times = instruction.times_executed;
+            for(auto addrtimes = instruction.branch_to_times.begin(); addrtimes != instruction.branch_to_times.end(); addrtimes++) {
+                addresses << std::hex << addrtimes->first << " (" << std::dec << addrtimes->second << ") ";
+                fallthrough_times -= addrtimes->second;
+            }
+            ImGui::Text("  -> %s/ ft (%ld)", addresses.str().c_str(), fallthrough_times);
+        }
+
+        if(is_pc && app.disassembly_scroll_to) {
+            ImGui::SetScrollHereY(0.5);
+            app.disassembly_scroll_to = false;
+        }
+
+        if(!is_pc && clicked) {
+            bool pc_changed = false;
+            if(current.registers.VI[TPC].UL > i) {
+                pc_changed = walk_until_pc_equal(app, i, -1);
+                if(!pc_changed) {
+                    pc_changed = walk_until_pc_equal(app, i, 1);
+                }
+            } else {
+                pc_changed = walk_until_pc_equal(app, i, 1);
+                if(!pc_changed) {
+                    pc_changed = walk_until_pc_equal(app, i, -1);
+                }
+            }
+            if(pc_changed) {
+                app.disassembly_scroll_to = true;
+            }
+        }
+
+        ImGui::TableSetColumnIndex(1);
+        
+        if(!is_pc) {
+            ImGui::PushStyleColor(ImGuiCol_FrameBg, ImVec4(0.f, 0.f, 0.f, 0.f));
+        }
+        ImVec2 comment_size(ImGui::GetWindowSize().x - 768.f, 14.f);
+        std::string &comment = app.comments.at(i / INSN_PAIR_SIZE);
+        ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(0, 0));
+        ImGui::PushItemWidth(-1);
+        ImGuiInputTextFlags comment_flags = app.comments_loaded ?
+                                            ImGuiInputTextFlags_None :
+                                            ImGuiInputTextFlags_ReadOnly;
+        if(ImGui::InputText("##comment", &comment, comment_flags)) {
+            save_comment_file(app);
+        }
+        ImGui::PopItemWidth();
+        ImGui::PopStyleVar();
+        if(!is_pc) {
+            ImGui::PopStyleColor();
+        }
+
+        ImGui::PopID();
+    }
+
+    ImGui::EndTable();
 	ImGui::EndChild();
 }
 
@@ -967,7 +970,7 @@ void main_menu_bar() {
         if(ImGui::BeginMenu("File")) {
             if(ImGui::MenuItem("Save", "Ctrl+S")) {            
             }
-            if(ImGui::MenuItem("Load Comment", "Ctrl+L")) {
+            if(ImGui::MenuItem("Load Comments", "Ctrl+L")) {
                 comment_box.is_open = true;
             }
             if(ImGui::MenuItem("Export Disassembly", "Ctrl+D")) {

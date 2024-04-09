@@ -41,6 +41,7 @@
 static const int INSN_PAIR_SIZE = 8;
 static int row_size_imgui = 4;
 static int row_size = 16;
+static bool show_as_hex = false;
 
 struct Snapshot
 {
@@ -299,8 +300,7 @@ void snapshots_window(AppState &app)
 void registers_window(AppState &app) {
     Snapshot &current = app.snapshots[app.current_snapshot];
     VURegs &regs = current.registers;
-
-    static bool show_as_hex = false;
+    
     static const char *integer_register_names[] = {
             "vi00", "vi01", "vi02", "vi03",
             "vi04", "vi05", "vi06", "vi07",
@@ -311,9 +311,7 @@ void registers_window(AppState &app) {
             "c2c24", "c2c25", "TPC", "CMSAR0",
             "FBRST", "VPU-STAT", "c2c30", "CMSAR1",
     };
-
-    ImGui::Checkbox("Show as Hex", &show_as_hex);
-
+    
     ImGui::BeginTable("Registers", 2, ImGuiTableFlags_SizingStretchProp | ImGuiTableFlags_BordersInnerV |
                                            ImGuiTableFlags_BordersInnerH | ImGuiTableFlags_Resizable);
 
@@ -978,6 +976,12 @@ void main_menu_bar() {
             }
             ImGui::EndMenu();
         }
+        if(ImGui::BeginMenu("Registers")) {
+            if(ImGui::MenuItem("Show as Hex", "Ctrl+Q", show_as_hex)) {
+                show_as_hex = !show_as_hex;
+            }
+            ImGui::EndMenu();
+        }
         if(ImGui::BeginMenu("Memory")) {
             if(ImGui::MenuItem("Search", "Ctrl+F")) {
                 find_bytes.is_open = true;
@@ -993,7 +997,6 @@ void main_menu_bar() {
             }
             ImGui::EndMenu();
         }
-        
         if(ImGui::BeginMenu("Font")) {
             if(ImGui::SliderFloat("##Size", &ImGui::GetIO().FontGlobalScale, 0.1f, 2.0f, "Size %.1f")) {
             }
@@ -1020,6 +1023,9 @@ void handle_shortcuts() {
         }
         if(ImGui::IsKeyPressed(ImGuiKey_G)) {
             comment_box.is_open = !comment_box.is_open;
+        }
+        if(ImGui::IsKeyPressed(ImGuiKey_Q)) {
+            show_as_hex = !show_as_hex;
         }
     }
 }

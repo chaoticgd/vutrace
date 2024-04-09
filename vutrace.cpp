@@ -39,6 +39,8 @@
 #include "gif.h"
 
 static const int INSN_PAIR_SIZE = 8;
+static int row_size_imgui = 4;
+static int row_size = 16;
 
 struct Snapshot
 {
@@ -79,6 +81,11 @@ struct MessageBoxState
 	std::string text;
 };
 
+static MessageBoxState export_box;
+static MessageBoxState comment_box;
+static MessageBoxState save_to_file;
+static MessageBoxState find_bytes;
+
 void update_gui(AppState &app);
 void snapshots_window(AppState &app);
 void registers_window(AppState &app);
@@ -93,7 +100,8 @@ void save_comment_file(AppState &app);
 std::string disassemble(u8 *program, u32 address);
 bool is_xgkick(u32 lower);
 void init_gui(GLFWwindow **window);
-void main_menu_bar(AppState &app);
+void main_menu_bar();
+void handle_shortcuts();
 void begin_docking();
 void create_dock_layout(GLFWwindow *window);
 void alert(MessageBoxState &state, const char *title);
@@ -150,7 +158,7 @@ int main(int argc, char **argv)
 			}
 		}
         
-        main_menu_bar(app);
+        main_menu_bar();
 
 		begin_docking();
 		update_gui(app);
@@ -353,7 +361,6 @@ void memory_window(AppState &app)
 	static MessageBoxState found_bytes;
 	alert(found_bytes, "Found Bytes");
 	
-	static MessageBoxState find_bytes;
 	if(prompt(find_bytes, "Find Bytes") && !found_bytes.is_open) {
 		std::vector<u8> value_raw = decode_hex(find_bytes.text);
 		for(std::size_t i = 0; i < VU1_MEMSIZE - value_raw.size(); i++) {
@@ -368,9 +375,7 @@ void memory_window(AppState &app)
 			found_bytes.text = "No match found";
 		}
 	}
-	
-	ImGui::SameLine();
-	static MessageBoxState save_to_file;
+    
 	if(prompt(save_to_file, "Save to File")) {
 		FILE* dump_file = fopen(save_to_file.text.c_str(), "wb");
 		if(dump_file) {
@@ -379,14 +384,6 @@ void memory_window(AppState &app)
 		} else {
 			fprintf(stderr, "Failed to open %s for writing.\n", save_to_file.text.c_str());
 		}
-	}
-	
-	static int row_size_imgui = 4;
-	static int row_size = 16;
-	ImGui::SameLine();
-	ImGui::PushItemWidth(100);
-	if(ImGui::SliderInt("##rowsize", &row_size_imgui, 1, 8, "Line Width: %d")) {
-		row_size = row_size_imgui * 4;
 	}
 	
 	ImGui::SameLine();
@@ -471,11 +468,25 @@ void disassembly_window(AppState &app)
 	ImGui::PushItemWidth(ImGui::GetWindowWidth() - (ImGui::GetWindowWidth() * .75f));
 	ImGui::InputText("Highlight", &app.disassembly_highlight);
 	ImGui::PopItemWidth();
-	ImGui::SameLine();
-	
+    
+    if(prompt(comment_box, "Load Comment File")) {
+        parse_comment_file(app, comment_box.text);
+    }
+    if(prompt(export_box, "Export Disassembly")) {
+        std::ofstream disassembly_out_file(export_box.text);
+        for(std::size_t i = 0; i < VU1_PROGSIZE; i+= INSN_PAIR_SIZE) {
+            disassembly_out_file << disassemble(&current.program[i], i);
+            if(app.comments.at(i / INSN_PAIR_SIZE).size() > 0) {
+                disassembly_out_file << "; ";
+            }
+            disassembly_out_file << app.comments.at(i / INSN_PAIR_SIZE);
+            disassembly_out_file << "\n";
+        }
+    }
+    
 	ImGui::BeginChild("disasm");
 	ImGui::Columns(2);
-	ImGui::SetColumnWidth(0, 768);
+	ImGui::SetColumnWidth(0, ImGui::GetWindowWidth() - (ImGui::GetWindowWidth() * .25f));
 	
 	for(std::size_t i = 0; i < VU1_PROGSIZE; i += INSN_PAIR_SIZE) {
 		ImGui::PushID(i);
@@ -949,44 +960,64 @@ void init_gui(GLFWwindow **window)
 	ImGui_ImplOpenGL3_Init("#version 120");
 }
 
-void main_menu_bar(AppState &app) {
-    Snapshot &current = app.snapshots[app.current_snapshot];
-    static MessageBoxState export_box;
-    static MessageBoxState comment_box;
+void main_menu_bar() {
+    handle_shortcuts();
     
     if (ImGui::BeginMainMenuBar()) {
         if(ImGui::BeginMenu("File")) {
             if(ImGui::MenuItem("Save", "Ctrl+S")) {            
             }
-            if(ImGui::MenuItem("Load Comment File", "Ctrl+L")) {
-                if(prompt(comment_box, "Load Comment File")) {
-                    parse_comment_file(app, comment_box.text);
-                }
+            if(ImGui::MenuItem("Load Comment", "Ctrl+L")) {
+                comment_box.is_open = true;
             }
             if(ImGui::MenuItem("Export Disassembly", "Ctrl+D")) {
-                if(prompt(export_box, "Export Disassembly")) {
-                    std::ofstream disassembly_out_file(export_box.text);
-                    for(std::size_t i = 0; i < VU1_PROGSIZE; i+= INSN_PAIR_SIZE) {
-                        disassembly_out_file << disassemble(&current.program[i], i);
-                        if(app.comments.at(i / INSN_PAIR_SIZE).size() > 0) {
-                            disassembly_out_file << "; ";
-                        }
-                        disassembly_out_file << app.comments.at(i / INSN_PAIR_SIZE);
-                        disassembly_out_file << "\n";
-                    }
-                }
+                export_box.is_open = true;
+            }
+            ImGui::EndMenu();
+        }
+        if(ImGui::BeginMenu("Memory")) {
+            if(ImGui::MenuItem("Search", "Ctrl+F")) {
+                find_bytes.is_open = true;
+            }
+            if(ImGui::MenuItem("Dump", "Ctrl+T")) {
+                save_to_file.is_open = true;
+            }
+            if(ImGui::MenuItem("Go To", "Ctrl+G")) {
+                find_bytes.is_open = true;
+            }
+            if(ImGui::SliderInt("##rowsize", &row_size_imgui, 1, 8, "Line Width: %d")) {
+                row_size = row_size_imgui * 4;
             }
             ImGui::EndMenu();
         }
         
         if(ImGui::BeginMenu("Font")) {
-            if(ImGui::SliderFloat("Size", &ImGui::GetIO().FontGlobalScale, 0.1f, 2.0f, "%.1f")) {
+            if(ImGui::SliderFloat("##Size", &ImGui::GetIO().FontGlobalScale, 0.1f, 2.0f, "Size %.1f")) {
             }
             ImGui::EndMenu();
         }
         
-        
         ImGui::EndMainMenuBar();
+    }
+}
+
+void handle_shortcuts() {
+    if(ImGui::IsKeyPressed(ImGuiKey_LeftCtrl)) {
+        if(ImGui::IsKeyPressed(ImGuiKey_F)) {
+            find_bytes.is_open = !find_bytes.is_open;
+        }
+        if(ImGui::IsKeyPressed(ImGuiKey_T)) {
+            save_to_file.is_open = !save_to_file.is_open;
+        }
+        if(ImGui::IsKeyPressed(ImGuiKey_D)) {
+            export_box.is_open = !export_box.is_open;
+        }
+        if(ImGui::IsKeyPressed(ImGuiKey_L)) {
+            comment_box.is_open = !comment_box.is_open;
+        }
+        if(ImGui::IsKeyPressed(ImGuiKey_G)) {
+            comment_box.is_open = !comment_box.is_open;
+        }
     }
 }
 
@@ -1059,11 +1090,7 @@ void alert(MessageBoxState &state, const char *title)
 bool prompt(MessageBoxState &state, const char *title)
 {
 	bool result = false;
-	if(ImGui::Button(title)) {
-		state.is_open = true;
-		state.text = "";
-	}
-	if(state.is_open) {
+    if(state.is_open) {
 		ImGui::SetNextWindowSize(ImVec2(400, 100));
 		ImGui::Begin(title);
 		ImGui::InputText("##input", &state.text);

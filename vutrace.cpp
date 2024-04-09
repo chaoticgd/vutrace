@@ -37,6 +37,7 @@
 #include "pcsx2defs.h"
 #include "pcsx2disassemble.h"
 #include "gif.h"
+#include "fonts.h"
 
 static const int INSN_PAIR_SIZE = 8;
 static int row_size_imgui = 4;
@@ -945,10 +946,8 @@ void init_gui(GLFWwindow **window)
 	IMGUI_CHECKVERSION();
 	ImGui::CreateContext();
 	ImGuiIO &io = ImGui::GetIO();
-
-    io.Fonts->AddFontFromFileTTF("ProggyVector-Regular.ttf", 20.0f);
     
-    io.FontGlobalScale = 1.0f;
+    io.Fonts->AddFontFromMemoryCompressedTTF(&ProggyVectorRegular_compressed_data, ProggyVectorRegular_compressed_size, 20.0f);
     
 	io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;
 	io.ConfigFlags |= ImGuiConfigFlags_DockingEnable;

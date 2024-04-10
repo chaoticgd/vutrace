@@ -44,6 +44,10 @@ static int row_size_imgui = 4;
 static int row_size = 16;
 static int tick_rate = 1;
 static bool show_as_hex = false;
+static float font_size = 16.0f;
+static bool use_default_font = false;
+static bool require_font_update = false;
+static ImFontConfig default_font_cfg = ImFontConfig();
 
 struct Snapshot
 {
@@ -105,6 +109,7 @@ void save_comment_file(AppState &app);
 std::string disassemble(u8 *program, u32 address);
 bool is_xgkick(u32 lower);
 void init_gui(GLFWwindow **window);
+void update_font();
 void main_menu_bar();
 void handle_shortcuts();
 void begin_docking();
@@ -136,6 +141,10 @@ int main(int argc, char **argv)
 	ImGuiContext &g = *GImGui;
 
 	while(!glfwWindowShouldClose(window)) {
+        if (require_font_update) {
+            update_font();
+        }
+        
 		glfwPollEvents();
 
 		ImGui_ImplOpenGL3_NewFrame();
@@ -341,7 +350,7 @@ void registers_window(AppState &app) {
     ImGui::TableSetColumnIndex(0);
     if (show_as_hex) {
         ImGui::Text("ACC = %08x %08x %08x %08x",
-                    regs.ACC.F[0], regs.ACC.F[1], regs.ACC.F[2], regs.ACC.F[3]);
+                    regs.ACC.UL[0], regs.ACC.UL[1], regs.ACC.UL[2], regs.ACC.UL[3]);
     } else {
         ImGui::Text("ACC = %.4f %.4f %.4f %.4f",
                     regs.ACC.F[0], regs.ACC.F[1], regs.ACC.F[2], regs.ACC.F[3]);
@@ -955,7 +964,7 @@ void init_gui(GLFWwindow **window)
 	ImGui::CreateContext();
 	ImGuiIO &io = ImGui::GetIO();
     
-    io.Fonts->AddFontFromMemoryCompressedTTF(&ProggyVectorRegular_compressed_data, ProggyVectorRegular_compressed_size, 20.0f);
+    io.Fonts->AddFontFromMemoryCompressedTTF(&ProggyVectorRegular_compressed_data, ProggyVectorRegular_compressed_size, font_size);
     
 	io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;
 	io.ConfigFlags |= ImGuiConfigFlags_DockingEnable;
@@ -966,6 +975,24 @@ void init_gui(GLFWwindow **window)
     io.Fonts->Build();
 	ImGui_ImplGlfw_InitForOpenGL(*window, true);
 	ImGui_ImplOpenGL3_Init("#version 120");
+}
+
+void update_font() {
+    ImGuiIO &io = ImGui::GetIO();
+    
+    io.Fonts->Clear();
+    io.Fonts->ClearFonts();
+
+    if(use_default_font) {
+        default_font_cfg.SizePixels = font_size;
+        io.FontDefault = io.Fonts->AddFontDefault(&default_font_cfg);
+    } else {
+        io.FontDefault = io.Fonts->AddFontFromMemoryCompressedTTF(&ProggyVectorRegular_compressed_data, ProggyVectorRegular_compressed_size, font_size);
+    }
+
+    io.Fonts->Build();
+    ImGui_ImplOpenGL3_CreateFontsTexture();
+    require_font_update = false;
 }
 
 void main_menu_bar() {
@@ -1009,7 +1036,12 @@ void main_menu_bar() {
             ImGui::EndMenu();
         }
         if(ImGui::BeginMenu("Font")) {
-            if(ImGui::SliderFloat("##Size", &ImGui::GetIO().FontGlobalScale, 0.1f, 2.0f, "Size %.1f")) {
+            if(ImGui::MenuItem("Use Default", "", use_default_font)) {
+                use_default_font = !use_default_font;
+                require_font_update = true;
+            }
+            if(ImGui::InputFloat("##Size", &font_size, 1.0f, 20.0f, "Size %1.0f")) {
+                require_font_update = true;
             }
             ImGui::EndMenu();
         }
@@ -1019,7 +1051,7 @@ void main_menu_bar() {
 }
 
 void handle_shortcuts() {
-    if(ImGui::IsKeyPressed(ImGuiKey_LeftCtrl)) {
+    if(ImGui::IsKeyDown(ImGuiKey_LeftCtrl)) {
         if(ImGui::IsKeyPressed(ImGuiKey_F)) {
             find_bytes.is_open = !find_bytes.is_open;
         }

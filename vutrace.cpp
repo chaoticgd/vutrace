@@ -62,6 +62,7 @@ struct Instruction
 	std::map<u32, std::size_t> branch_to_times;
 	std::map<u32, std::size_t> branch_from_times;
 	std::size_t times_executed = 0;
+    std::string disassembly;
 };
 
 struct AppState
@@ -89,7 +90,6 @@ static MessageBoxState comment_box;
 static MessageBoxState save_to_file;
 static MessageBoxState find_bytes;
 static MessageBoxState go_to_box;
-std::vector<std::string> disasm_instructions;
 
 void update_gui(AppState &app);
 void snapshots_window(AppState &app);
@@ -502,7 +502,7 @@ void disassembly_window(AppState &app)
                                      ImGuiSelectableFlags_None :
                                      ImGuiSelectableFlags_Disabled;
 
-        std::string disassembly = disasm_instructions[i >> 3]; 
+        std::string disassembly = instruction.disassembly; 
 
         if(instruction.branch_from_times.size() > 0) {
             std::stringstream addresses;
@@ -896,7 +896,7 @@ void parse_trace(AppState &app, std::string trace_file_path)
 	fclose(trace);
 
     for(std::size_t i = 0; i < VU1_PROGSIZE; i += INSN_PAIR_SIZE) {
-        disasm_instructions.push_back(disassemble(&current.program[i], i));
+        app.instructions[i >> 3].disassembly = disassemble(&current.program[i], i);
     }    
 }
 
@@ -982,7 +982,7 @@ void main_menu_bar() {
             ImGui::EndMenu();
         }
         if(ImGui::BeginMenu("System")) {
-            if(ImGui::SliderInt("##tickrate", &tick_rate, 0, 5, "Tick Rate %d")) {
+            if(ImGui::SliderInt("##tickrate", &tick_rate, 0, 5, "App Refresh Rate %d")) {
                 glfwSwapInterval(tick_rate);
             }
             ImGui::EndMenu();

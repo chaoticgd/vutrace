@@ -1009,9 +1009,14 @@ void main_menu_bar() {
             ImGui::EndMenu();
         }
         if(ImGui::BeginMenu("System")) {
+            
             if(ImGui::SliderInt("##tickrate", &tick_rate, 0, 5, "App Refresh Rate %d")) {
+                
                 glfwSwapInterval(tick_rate);
             }
+            
+            ImGui::SetItemTooltip("Limits the application's refresh rate to decrease impact on CPU. Assuming a 60Hz monitor, the default value (1) is enough.\n0 is unlimited, 60Hz / 2 = 30fps, 60Hz / 3 = 20fps, etc.");
+            
             ImGui::EndMenu();
         }
         if(ImGui::BeginMenu("Registers")) {

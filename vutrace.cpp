@@ -257,9 +257,7 @@ void snapshots_window(AppState &app)
 		ImGui::EndTabBar();
 	}
 	
-	ImVec2 size = ImGui::GetWindowSize();
-	size.x -= 16;
-	size.y -= 82;
+	ImVec2 size = ImGui::GetContentRegionAvail();
 	ImGui::PushItemWidth(-1);
 	if(ImGui::BeginListBox("##snapshots", size)) {
 		for(std::size_t i = 0; i < app.snapshots.size(); i++) {

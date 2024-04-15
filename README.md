@@ -58,6 +58,11 @@ where `vu0MicroMem.bin` or `vu1MicroMem.bin` can be extracted from a PCSX2 save 
 
 ## Recent Changelog
 
+### 2024-04-15
+
+- Revamp UI. [wagrenier](https://github.com/wagrenier)
+- Improve performance by parsing disassembled instruction once on startup. [wagrenier](https://github.com/wagrenier)
+
 ### 2024-04-04
 
 - Updated dependencies.

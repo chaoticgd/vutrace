@@ -66,7 +66,7 @@ struct Instruction
 	std::map<u32, std::size_t> branch_to_times;
 	std::map<u32, std::size_t> branch_from_times;
 	std::size_t times_executed = 0;
-    std::string disassembly;
+	std::string disassembly;
 };
 
 struct AppState
@@ -141,10 +141,10 @@ int main(int argc, char **argv)
 	ImGuiContext &g = *GImGui;
 
 	while(!glfwWindowShouldClose(window)) {
-        if (require_font_update) {
-            update_font();
-        }
-        
+		if (require_font_update) {
+			update_font();
+		}
+		
 		glfwPollEvents();
 
 		ImGui_ImplOpenGL3_NewFrame();
@@ -171,8 +171,8 @@ int main(int argc, char **argv)
 				walk_until_pc_equal(app, pc, 1);
 			}
 		}
-        
-        main_menu_bar();
+		
+		main_menu_bar();
 
 		begin_docking();
 		update_gui(app);
@@ -309,52 +309,52 @@ void snapshots_window(AppState &app)
 }
 
 void registers_window(AppState &app) {
-    Snapshot &current = app.snapshots[app.current_snapshot];
-    VURegs &regs = current.registers;
-    
-    static const char *integer_register_names[] = {
-            "vi00", "vi01", "vi02", "vi03",
-            "vi04", "vi05", "vi06", "vi07",
-            "vi08", "vi09", "vi10", "vi11",
-            "vi12", "vi13", "vi14", "vi15",
-            "Status", "MACflag", "ClipFlag", "c2c19",
-            "R", "I", "Q", "c2c23",
-            "c2c24", "c2c25", "TPC", "CMSAR0",
-            "FBRST", "VPU-STAT", "c2c30", "CMSAR1",
-    };
-    
-    ImGui::BeginTable("Registers", 2, ImGuiTableFlags_SizingStretchProp | ImGuiTableFlags_BordersInnerV |
-                                           ImGuiTableFlags_BordersInnerH | ImGuiTableFlags_Resizable);
+	Snapshot &current = app.snapshots[app.current_snapshot];
+	VURegs &regs = current.registers;
+	
+	static const char *integer_register_names[] = {
+			"vi00", "vi01", "vi02", "vi03",
+			"vi04", "vi05", "vi06", "vi07",
+			"vi08", "vi09", "vi10", "vi11",
+			"vi12", "vi13", "vi14", "vi15",
+			"Status", "MACflag", "ClipFlag", "c2c19",
+			"R", "I", "Q", "c2c23",
+			"c2c24", "c2c25", "TPC", "CMSAR0",
+			"FBRST", "VPU-STAT", "c2c30", "CMSAR1",
+	};
+	
+	ImGui::BeginTable("Registers", 2, ImGuiTableFlags_SizingStretchProp | ImGuiTableFlags_BordersInnerV |
+										   ImGuiTableFlags_BordersInnerH | ImGuiTableFlags_Resizable);
 
-    for (int i = 0; i < 32; i++) {
-        VECTOR value = regs.VF[i];
-        ImGui::TableNextRow();
-        ImGui::TableSetColumnIndex(0);
+	for (int i = 0; i < 32; i++) {
+		VECTOR value = regs.VF[i];
+		ImGui::TableNextRow();
+		ImGui::TableSetColumnIndex(0);
 
-        if (show_as_hex) {
-            ImGui::Text("vf%02d = %08x %08x %08x %08x",
-                        i, value.UL[0], value.UL[1], value.UL[2], value.UL[3]);
-        } else {
-            ImGui::Text("vf%02d = %.4f %.4f %.4f %.4f",
-                        i, value.F[0], value.F[1], value.F[2], value.F[3]);
-        }
+		if (show_as_hex) {
+			ImGui::Text("vf%02d = %08x %08x %08x %08x",
+						i, value.UL[0], value.UL[1], value.UL[2], value.UL[3]);
+		} else {
+			ImGui::Text("vf%02d = %.4f %.4f %.4f %.4f",
+						i, value.F[0], value.F[1], value.F[2], value.F[3]);
+		}
 
-        ImGui::TableSetColumnIndex(1);
+		ImGui::TableSetColumnIndex(1);
 
-        ImGui::Text("%s = 0x%x = %hd", integer_register_names[i], regs.VI[i].UL, regs.VI[i].UL);
-    }
+		ImGui::Text("%s = 0x%x = %hd", integer_register_names[i], regs.VI[i].UL, regs.VI[i].UL);
+	}
 
-    ImGui::TableNextRow();
-    ImGui::TableSetColumnIndex(0);
-    if (show_as_hex) {
-        ImGui::Text("ACC = %08x %08x %08x %08x",
-                    regs.ACC.UL[0], regs.ACC.UL[1], regs.ACC.UL[2], regs.ACC.UL[3]);
-    } else {
-        ImGui::Text("ACC = %.4f %.4f %.4f %.4f",
-                    regs.ACC.F[0], regs.ACC.F[1], regs.ACC.F[2], regs.ACC.F[3]);
-    }
+	ImGui::TableNextRow();
+	ImGui::TableSetColumnIndex(0);
+	if (show_as_hex) {
+		ImGui::Text("ACC = %08x %08x %08x %08x",
+					regs.ACC.UL[0], regs.ACC.UL[1], regs.ACC.UL[2], regs.ACC.UL[3]);
+	} else {
+		ImGui::Text("ACC = %.4f %.4f %.4f %.4f",
+					regs.ACC.F[0], regs.ACC.F[1], regs.ACC.F[2], regs.ACC.F[3]);
+	}
 
-    ImGui::EndTable();
+	ImGui::EndTable();
 }
 
 void memory_window(AppState &app)
@@ -384,7 +384,7 @@ void memory_window(AppState &app)
 			found_bytes.text = "No match found";
 		}
 	}
-    
+	
 	if(prompt(save_to_file, "Save to File")) {
 		FILE* dump_file = fopen(save_to_file.text.c_str(), "wb");
 		if(dump_file) {
@@ -394,14 +394,14 @@ void memory_window(AppState &app)
 			fprintf(stderr, "Failed to open %s for writing.\n", save_to_file.text.c_str());
 		}
 	}
-    
+	
 	static std::string scroll_to_address_str;
 	s32 scroll_to_address = -1;
 
-    if(prompt(go_to_box, "Scroll To Address"))
-    {
-        scroll_to_address = strtol(go_to_box.text.c_str(), NULL, 16);
-    }
+	if(prompt(go_to_box, "Scroll To Address"))
+	{
+		scroll_to_address = strtol(go_to_box.text.c_str(), NULL, 16);
+	}
 	
 	ImGui::BeginChild("rows_outer");
 	if(ImGui::BeginChild("rows")) {
@@ -477,120 +477,120 @@ void disassembly_window(AppState &app)
 	ImGui::PushItemWidth(ImGui::GetWindowWidth() - (ImGui::GetWindowWidth() * .75f));
 	ImGui::InputText("Highlight", &app.disassembly_highlight);
 	ImGui::PopItemWidth();
-    
-    if(prompt(comment_box, "Load Comment File")) {
-        parse_comment_file(app, comment_box.text);
-    }
-    if(prompt(export_box, "Export Disassembly")) {
-        std::ofstream disassembly_out_file(export_box.text);
-        for(std::size_t i = 0; i < VU1_PROGSIZE; i+= INSN_PAIR_SIZE) {
-            disassembly_out_file << disassemble(&current.program[i], i);
-            if(app.comments.at(i / INSN_PAIR_SIZE).size() > 0) {
-                disassembly_out_file << "; ";
-            }
-            disassembly_out_file << app.comments.at(i / INSN_PAIR_SIZE);
-            disassembly_out_file << "\n";
-        }
-    }
+	
+	if(prompt(comment_box, "Load Comment File")) {
+		parse_comment_file(app, comment_box.text);
+	}
+	if(prompt(export_box, "Export Disassembly")) {
+		std::ofstream disassembly_out_file(export_box.text);
+		for(std::size_t i = 0; i < VU1_PROGSIZE; i+= INSN_PAIR_SIZE) {
+			disassembly_out_file << disassemble(&current.program[i], i);
+			if(app.comments.at(i / INSN_PAIR_SIZE).size() > 0) {
+				disassembly_out_file << "; ";
+			}
+			disassembly_out_file << app.comments.at(i / INSN_PAIR_SIZE);
+			disassembly_out_file << "\n";
+		}
+	}
 
-    ImGui::BeginChild("disasm");
+	ImGui::BeginChild("disasm");
 
-    ImGui::BeginTable("Instructions", 2, ImGuiTableFlags_SizingStretchProp | ImGuiTableFlags_BordersInnerV |
-                                      ImGuiTableFlags_BordersInnerH | ImGuiTableFlags_Resizable);
+	ImGui::BeginTable("Instructions", 2, ImGuiTableFlags_SizingStretchProp | ImGuiTableFlags_BordersInnerV |
+									  ImGuiTableFlags_BordersInnerH | ImGuiTableFlags_Resizable);
 
-    for(std::size_t i = 0; i < VU1_PROGSIZE; i += INSN_PAIR_SIZE) {
-        ImGui::TableNextRow();
-        ImGui::TableSetColumnIndex(0);
-        ImGui::PushID(i);
+	for(std::size_t i = 0; i < VU1_PROGSIZE; i += INSN_PAIR_SIZE) {
+		ImGui::TableNextRow();
+		ImGui::TableSetColumnIndex(0);
+		ImGui::PushID(i);
 
-        Instruction instruction = app.instructions[i / INSN_PAIR_SIZE];
-        bool is_pc = current.registers.VI[TPC].UL == i;
-        ImGuiSelectableFlags flags = instruction.is_executed ?
-                                     ImGuiSelectableFlags_None :
-                                     ImGuiSelectableFlags_Disabled;
+		Instruction instruction = app.instructions[i / INSN_PAIR_SIZE];
+		bool is_pc = current.registers.VI[TPC].UL == i;
+		ImGuiSelectableFlags flags = instruction.is_executed ?
+									 ImGuiSelectableFlags_None :
+									 ImGuiSelectableFlags_Disabled;
 
-        std::string disassembly = instruction.disassembly; 
+		std::string disassembly = instruction.disassembly; 
 
-        if(instruction.branch_from_times.size() > 0) {
-            std::stringstream addresses;
-            std::size_t fallthrough_times = app.instructions[i / 8 + 1].times_executed;
-            for(auto addrtimes = instruction.branch_from_times.begin(); addrtimes != instruction.branch_from_times.end(); addrtimes++) {
-                addresses << std::hex << addrtimes->first << " (" << std::dec << addrtimes->second << ") ";
-                fallthrough_times -= addrtimes->second;
-            }
-            ImGui::Text("  %s/ ft (%ld) ->", addresses.str().c_str(), fallthrough_times);
-        }
+		if(instruction.branch_from_times.size() > 0) {
+			std::stringstream addresses;
+			std::size_t fallthrough_times = app.instructions[i / 8 + 1].times_executed;
+			for(auto addrtimes = instruction.branch_from_times.begin(); addrtimes != instruction.branch_from_times.end(); addrtimes++) {
+				addresses << std::hex << addrtimes->first << " (" << std::dec << addrtimes->second << ") ";
+				fallthrough_times -= addrtimes->second;
+			}
+			ImGui::Text("  %s/ ft (%ld) ->", addresses.str().c_str(), fallthrough_times);
+		}
 
-        bool is_highlighted =
-                app.disassembly_highlight.size() > 0 &&
-                disassembly.find(app.disassembly_highlight) != std::string::npos;
+		bool is_highlighted =
+				app.disassembly_highlight.size() > 0 &&
+				disassembly.find(app.disassembly_highlight) != std::string::npos;
 
-        if(is_highlighted) {
-            ImGui::PushStyleColor(ImGuiCol_Text, ImColor(255, 255, 0).Value);
-        }
-        bool clicked = ImGui::Selectable(disassembly.c_str(), is_pc, flags);
-        if(is_highlighted) {
-            ImGui::PopStyleColor();
-        }
+		if(is_highlighted) {
+			ImGui::PushStyleColor(ImGuiCol_Text, ImColor(255, 255, 0).Value);
+		}
+		bool clicked = ImGui::Selectable(disassembly.c_str(), is_pc, flags);
+		if(is_highlighted) {
+			ImGui::PopStyleColor();
+		}
 
-        if(instruction.branch_to_times.size() > 0) {
-            std::stringstream addresses;
-            std::size_t fallthrough_times = instruction.times_executed;
-            for(auto addrtimes = instruction.branch_to_times.begin(); addrtimes != instruction.branch_to_times.end(); addrtimes++) {
-                addresses << std::hex << addrtimes->first << " (" << std::dec << addrtimes->second << ") ";
-                fallthrough_times -= addrtimes->second;
-            }
-            ImGui::Text("  -> %s/ ft (%ld)", addresses.str().c_str(), fallthrough_times);
-        }
+		if(instruction.branch_to_times.size() > 0) {
+			std::stringstream addresses;
+			std::size_t fallthrough_times = instruction.times_executed;
+			for(auto addrtimes = instruction.branch_to_times.begin(); addrtimes != instruction.branch_to_times.end(); addrtimes++) {
+				addresses << std::hex << addrtimes->first << " (" << std::dec << addrtimes->second << ") ";
+				fallthrough_times -= addrtimes->second;
+			}
+			ImGui::Text("  -> %s/ ft (%ld)", addresses.str().c_str(), fallthrough_times);
+		}
 
-        if(is_pc && app.disassembly_scroll_to) {
-            ImGui::SetScrollHereY(0.5);
-            app.disassembly_scroll_to = false;
-        }
+		if(is_pc && app.disassembly_scroll_to) {
+			ImGui::SetScrollHereY(0.5);
+			app.disassembly_scroll_to = false;
+		}
 
-        if(!is_pc && clicked) {
-            bool pc_changed = false;
-            if(current.registers.VI[TPC].UL > i) {
-                pc_changed = walk_until_pc_equal(app, i, -1);
-                if(!pc_changed) {
-                    pc_changed = walk_until_pc_equal(app, i, 1);
-                }
-            } else {
-                pc_changed = walk_until_pc_equal(app, i, 1);
-                if(!pc_changed) {
-                    pc_changed = walk_until_pc_equal(app, i, -1);
-                }
-            }
-            if(pc_changed) {
-                app.disassembly_scroll_to = true;
-            }
-        }
+		if(!is_pc && clicked) {
+			bool pc_changed = false;
+			if(current.registers.VI[TPC].UL > i) {
+				pc_changed = walk_until_pc_equal(app, i, -1);
+				if(!pc_changed) {
+					pc_changed = walk_until_pc_equal(app, i, 1);
+				}
+			} else {
+				pc_changed = walk_until_pc_equal(app, i, 1);
+				if(!pc_changed) {
+					pc_changed = walk_until_pc_equal(app, i, -1);
+				}
+			}
+			if(pc_changed) {
+				app.disassembly_scroll_to = true;
+			}
+		}
 
-        ImGui::TableSetColumnIndex(1);
-        
-        if(!is_pc) {
-            ImGui::PushStyleColor(ImGuiCol_FrameBg, ImVec4(0.f, 0.f, 0.f, 0.f));
-        }
-        ImVec2 comment_size(ImGui::GetWindowSize().x - 768.f, 14.f);
-        std::string &comment = app.comments.at(i / INSN_PAIR_SIZE);
-        ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(0, 0));
-        ImGui::PushItemWidth(-1);
-        ImGuiInputTextFlags comment_flags = app.comments_loaded ?
-                                            ImGuiInputTextFlags_None :
-                                            ImGuiInputTextFlags_ReadOnly;
-        if(ImGui::InputText("##comment", &comment, comment_flags)) {
-            save_comment_file(app);
-        }
-        ImGui::PopItemWidth();
-        ImGui::PopStyleVar();
-        if(!is_pc) {
-            ImGui::PopStyleColor();
-        }
+		ImGui::TableSetColumnIndex(1);
+		
+		if(!is_pc) {
+			ImGui::PushStyleColor(ImGuiCol_FrameBg, ImVec4(0.f, 0.f, 0.f, 0.f));
+		}
+		ImVec2 comment_size(ImGui::GetWindowSize().x - 768.f, 14.f);
+		std::string &comment = app.comments.at(i / INSN_PAIR_SIZE);
+		ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(0, 0));
+		ImGui::PushItemWidth(-1);
+		ImGuiInputTextFlags comment_flags = app.comments_loaded ?
+											ImGuiInputTextFlags_None :
+											ImGuiInputTextFlags_ReadOnly;
+		if(ImGui::InputText("##comment", &comment, comment_flags)) {
+			save_comment_file(app);
+		}
+		ImGui::PopItemWidth();
+		ImGui::PopStyleVar();
+		if(!is_pc) {
+			ImGui::PopStyleColor();
+		}
 
-        ImGui::PopID();
-    }
+		ImGui::PopID();
+	}
 
-    ImGui::EndTable();
+	ImGui::EndTable();
 	ImGui::EndChild();
 }
 
@@ -902,9 +902,9 @@ void parse_trace(AppState &app, std::string trace_file_path)
 	
 	fclose(trace);
 
-    for(std::size_t i = 0; i < VU1_PROGSIZE; i += INSN_PAIR_SIZE) {
-        app.instructions[i >> 3].disassembly = disassemble(&current.program[i], i);
-    }    
+	for(std::size_t i = 0; i < VU1_PROGSIZE; i += INSN_PAIR_SIZE) {
+		app.instructions[i >> 3].disassembly = disassemble(&current.program[i], i);
+	}    
 }
 
 void parse_comment_file(AppState &app, std::string comment_file_path) {
@@ -961,119 +961,119 @@ void init_gui(GLFWwindow **window)
 	IMGUI_CHECKVERSION();
 	ImGui::CreateContext();
 	ImGuiIO &io = ImGui::GetIO();
-    
-    io.Fonts->AddFontFromMemoryCompressedTTF(&ProggyVectorRegular_compressed_data, ProggyVectorRegular_compressed_size, font_size);
-    
+	
+	io.Fonts->AddFontFromMemoryCompressedTTF(&ProggyVectorRegular_compressed_data, ProggyVectorRegular_compressed_size, font_size);
+	
 	io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;
 	io.ConfigFlags |= ImGuiConfigFlags_DockingEnable;
 	io.ConfigDockingWithShift = true;
-    io.FontAllowUserScaling = true;
+	io.FontAllowUserScaling = true;
 	ImGui::StyleColorsDark();
-    
-    io.Fonts->Build();
+	
+	io.Fonts->Build();
 	ImGui_ImplGlfw_InitForOpenGL(*window, true);
 	ImGui_ImplOpenGL3_Init("#version 120");
 }
 
 void update_font() {
-    ImGuiIO &io = ImGui::GetIO();
-    
-    io.Fonts->Clear();
-    io.Fonts->ClearFonts();
+	ImGuiIO &io = ImGui::GetIO();
+	
+	io.Fonts->Clear();
+	io.Fonts->ClearFonts();
 
-    if(use_default_font) {
-        default_font_cfg.SizePixels = font_size;
-        io.FontDefault = io.Fonts->AddFontDefault(&default_font_cfg);
-    } else {
-        io.FontDefault = io.Fonts->AddFontFromMemoryCompressedTTF(&ProggyVectorRegular_compressed_data, ProggyVectorRegular_compressed_size, font_size);
-    }
+	if(use_default_font) {
+		default_font_cfg.SizePixels = font_size;
+		io.FontDefault = io.Fonts->AddFontDefault(&default_font_cfg);
+	} else {
+		io.FontDefault = io.Fonts->AddFontFromMemoryCompressedTTF(&ProggyVectorRegular_compressed_data, ProggyVectorRegular_compressed_size, font_size);
+	}
 
-    io.Fonts->Build();
-    ImGui_ImplOpenGL3_CreateFontsTexture();
-    require_font_update = false;
+	io.Fonts->Build();
+	ImGui_ImplOpenGL3_CreateFontsTexture();
+	require_font_update = false;
 }
 
 void main_menu_bar() {
-    handle_shortcuts();
-    
-    if (ImGui::BeginMainMenuBar()) {
-        if(ImGui::BeginMenu("File")) {
-            if(ImGui::MenuItem("Load Comments", "Ctrl+L")) {
-                comment_box.is_open = true;
-            }
-            if(ImGui::MenuItem("Export Disassembly", "Ctrl+D")) {
-                export_box.is_open = true;
-            }
-            ImGui::EndMenu();
-        }
-        if(ImGui::BeginMenu("System")) {
-            
-            if(ImGui::SliderInt("##tickrate", &tick_rate, 0, 5, "App Refresh Rate %d")) {
-                
-                glfwSwapInterval(tick_rate);
-            }
-            
-            ImGui::SetItemTooltip("Limits the application's refresh rate to decrease impact on CPU. Assuming a 60Hz monitor, the default value (1) is enough.\n0 is unlimited, 60Hz / 2 = 30fps, 60Hz / 3 = 20fps, etc.");
-            
-            ImGui::EndMenu();
-        }
-        if(ImGui::BeginMenu("Registers")) {
-            if(ImGui::MenuItem("Show as Hex", "Ctrl+Q", show_as_hex)) {
-                show_as_hex = !show_as_hex;
-            }
-            ImGui::EndMenu();
-        }
-        if(ImGui::BeginMenu("Memory")) {
-            if(ImGui::MenuItem("Search", "Ctrl+F")) {
-                find_bytes.is_open = true;
-            }
-            if(ImGui::MenuItem("Dump", "Ctrl+T")) {
-                save_to_file.is_open = true;
-            }
-            if(ImGui::MenuItem("Go To", "Ctrl+G")) {
-                go_to_box.is_open = true;
-            }
-            if(ImGui::SliderInt("##rowsize", &row_size_imgui, 1, 8, "Line Width: %d")) {
-                row_size = row_size_imgui * 4;
-            }
-            ImGui::EndMenu();
-        }
-        if(ImGui::BeginMenu("Font")) {
-            if(ImGui::MenuItem("Use Default", "", use_default_font)) {
-                use_default_font = !use_default_font;
-                require_font_update = true;
-            }
-            if(ImGui::InputFloat("##Size", &font_size, 1.0f, 20.0f, "Size %1.0f")) {
-                require_font_update = true;
-            }
-            ImGui::EndMenu();
-        }
-        
-        ImGui::EndMainMenuBar();
-    }
+	handle_shortcuts();
+	
+	if (ImGui::BeginMainMenuBar()) {
+		if(ImGui::BeginMenu("File")) {
+			if(ImGui::MenuItem("Load Comments", "Ctrl+L")) {
+				comment_box.is_open = true;
+			}
+			if(ImGui::MenuItem("Export Disassembly", "Ctrl+D")) {
+				export_box.is_open = true;
+			}
+			ImGui::EndMenu();
+		}
+		if(ImGui::BeginMenu("System")) {
+			
+			if(ImGui::SliderInt("##tickrate", &tick_rate, 0, 5, "App Refresh Rate %d")) {
+				
+				glfwSwapInterval(tick_rate);
+			}
+			
+			ImGui::SetItemTooltip("Limits the application's refresh rate to decrease impact on CPU. Assuming a 60Hz monitor, the default value (1) is enough.\n0 is unlimited, 60Hz / 2 = 30fps, 60Hz / 3 = 20fps, etc.");
+			
+			ImGui::EndMenu();
+		}
+		if(ImGui::BeginMenu("Registers")) {
+			if(ImGui::MenuItem("Show as Hex", "Ctrl+Q", show_as_hex)) {
+				show_as_hex = !show_as_hex;
+			}
+			ImGui::EndMenu();
+		}
+		if(ImGui::BeginMenu("Memory")) {
+			if(ImGui::MenuItem("Search", "Ctrl+F")) {
+				find_bytes.is_open = true;
+			}
+			if(ImGui::MenuItem("Dump", "Ctrl+T")) {
+				save_to_file.is_open = true;
+			}
+			if(ImGui::MenuItem("Go To", "Ctrl+G")) {
+				go_to_box.is_open = true;
+			}
+			if(ImGui::SliderInt("##rowsize", &row_size_imgui, 1, 8, "Line Width: %d")) {
+				row_size = row_size_imgui * 4;
+			}
+			ImGui::EndMenu();
+		}
+		if(ImGui::BeginMenu("Font")) {
+			if(ImGui::MenuItem("Use Default", "", use_default_font)) {
+				use_default_font = !use_default_font;
+				require_font_update = true;
+			}
+			if(ImGui::InputFloat("##Size", &font_size, 1.0f, 20.0f, "Size %1.0f")) {
+				require_font_update = true;
+			}
+			ImGui::EndMenu();
+		}
+		
+		ImGui::EndMainMenuBar();
+	}
 }
 
 void handle_shortcuts() {
-    if(ImGui::IsKeyDown(ImGuiKey_LeftCtrl)) {
-        if(ImGui::IsKeyPressed(ImGuiKey_F)) {
-            find_bytes.is_open = !find_bytes.is_open;
-        }
-        if(ImGui::IsKeyPressed(ImGuiKey_T)) {
-            save_to_file.is_open = !save_to_file.is_open;
-        }
-        if(ImGui::IsKeyPressed(ImGuiKey_D)) {
-            export_box.is_open = !export_box.is_open;
-        }
-        if(ImGui::IsKeyPressed(ImGuiKey_L)) {
-            comment_box.is_open = !comment_box.is_open;
-        }
-        if(ImGui::IsKeyPressed(ImGuiKey_G)) {
-            go_to_box.is_open = !go_to_box.is_open;
-        }
-        if(ImGui::IsKeyPressed(ImGuiKey_Q)) {
-            show_as_hex = !show_as_hex;
-        }
-    }
+	if(ImGui::IsKeyDown(ImGuiKey_LeftCtrl)) {
+		if(ImGui::IsKeyPressed(ImGuiKey_F)) {
+			find_bytes.is_open = !find_bytes.is_open;
+		}
+		if(ImGui::IsKeyPressed(ImGuiKey_T)) {
+			save_to_file.is_open = !save_to_file.is_open;
+		}
+		if(ImGui::IsKeyPressed(ImGuiKey_D)) {
+			export_box.is_open = !export_box.is_open;
+		}
+		if(ImGui::IsKeyPressed(ImGuiKey_L)) {
+			comment_box.is_open = !comment_box.is_open;
+		}
+		if(ImGui::IsKeyPressed(ImGuiKey_G)) {
+			go_to_box.is_open = !go_to_box.is_open;
+		}
+		if(ImGui::IsKeyPressed(ImGuiKey_Q)) {
+			show_as_hex = !show_as_hex;
+		}
+	}
 }
 
 void begin_docking() {
@@ -1145,10 +1145,10 @@ void alert(MessageBoxState &state, const char *title)
 bool prompt(MessageBoxState &state, const char *title)
 {
 	bool result = false;
-    if(state.is_open) {
+	if(state.is_open) {
 		ImGui::SetNextWindowSize(ImVec2(400, 100));
 		ImGui::Begin(title, &state.is_open);
-        ImGui::InputText("##input", &state.text, ImGuiInputTextFlags_AutoSelectAll);
+		ImGui::InputText("##input", &state.text, ImGuiInputTextFlags_AutoSelectAll);
 		if(ImGui::Button("Okay") || ImGui::IsKeyPressed(ImGuiKey_Enter)) {
 			state.is_open = false;
 			result = true;

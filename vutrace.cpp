@@ -37,8 +37,17 @@
 #include "pcsx2defs.h"
 #include "pcsx2disassemble.h"
 #include "gif.h"
+#include "fonts.h"
 
 static const int INSN_PAIR_SIZE = 8;
+static int row_size_imgui = 4;
+static int row_size = 16;
+static int tick_rate = 1;
+static bool show_as_hex = false;
+static float font_size = 16.0f;
+static bool use_default_font = false;
+static bool require_font_update = false;
+static ImFontConfig default_font_cfg = ImFontConfig();
 
 struct Snapshot
 {
@@ -57,6 +66,7 @@ struct Instruction
 	std::map<u32, std::size_t> branch_to_times;
 	std::map<u32, std::size_t> branch_from_times;
 	std::size_t times_executed = 0;
+	std::string disassembly;
 };
 
 struct AppState
@@ -79,6 +89,12 @@ struct MessageBoxState
 	std::string text;
 };
 
+static MessageBoxState export_box;
+static MessageBoxState comment_box;
+static MessageBoxState save_to_file;
+static MessageBoxState find_bytes;
+static MessageBoxState go_to_box;
+
 void update_gui(AppState &app);
 void snapshots_window(AppState &app);
 void registers_window(AppState &app);
@@ -93,6 +109,9 @@ void save_comment_file(AppState &app);
 std::string disassemble(u8 *program, u32 address);
 bool is_xgkick(u32 lower);
 void init_gui(GLFWwindow **window);
+void update_font();
+void main_menu_bar();
+void handle_shortcuts();
 void begin_docking();
 void create_dock_layout(GLFWwindow *window);
 void alert(MessageBoxState &state, const char *title);
@@ -122,6 +141,10 @@ int main(int argc, char **argv)
 	ImGuiContext &g = *GImGui;
 
 	while(!glfwWindowShouldClose(window)) {
+		if (require_font_update) {
+			update_font();
+		}
+		
 		glfwPollEvents();
 
 		ImGui_ImplOpenGL3_NewFrame();
@@ -148,6 +171,8 @@ int main(int argc, char **argv)
 				walk_until_pc_equal(app, pc, 1);
 			}
 		}
+		
+		main_menu_bar();
 
 		begin_docking();
 		update_gui(app);
@@ -232,9 +257,7 @@ void snapshots_window(AppState &app)
 		ImGui::EndTabBar();
 	}
 	
-	ImVec2 size = ImGui::GetWindowSize();
-	size.x -= 16;
-	size.y -= 82;
+	ImVec2 size = ImGui::GetContentRegionAvail();
 	ImGui::PushItemWidth(-1);
 	if(ImGui::BeginListBox("##snapshots", size)) {
 		for(std::size_t i = 0; i < app.snapshots.size(); i++) {
@@ -285,36 +308,11 @@ void snapshots_window(AppState &app)
 	ImGui::PopItemWidth();
 }
 
-void registers_window(AppState &app)
-{
+void registers_window(AppState &app) {
 	Snapshot &current = app.snapshots[app.current_snapshot];
 	VURegs &regs = current.registers;
 	
-	static bool show_as_hex = false;
-	
-	ImGui::Columns(2);
-		ImGui::Checkbox("Show as Hex", &show_as_hex);
-	
-		for(int i = 0; i < 32; i++) {
-			VECTOR value = regs.VF[i];
-			if(show_as_hex) {
-				ImGui::Text("vf%02d = %08x %08x %08x %08x",
-					i, value.UL[0], value.UL[1], value.UL[2], value.UL[3]);
-			} else {
-				ImGui::Text("vf%02d = %.4f %.4f %.4f %.4f",
-					i, value.F[0], value.F[1], value.F[2], value.F[3]);
-			}
-		}
-		if(show_as_hex) {
-			ImGui::Text("ACC = %08x %08x %08x %08x",
-				regs.ACC.UL[0], regs.ACC.UL[1], regs.ACC.UL[2], regs.ACC.UL[3]);
-		} else {
-			ImGui::Text("ACC = %.4f %.4f %.4f %.4f",
-				regs.ACC.F[0], regs.ACC.F[1], regs.ACC.F[2], regs.ACC.F[3]);
-		}
-	ImGui::NextColumn();
-	ImGui::SetColumnWidth(1, 192);
-		static const char *integer_register_names[] = {
+	static const char *integer_register_names[] = {
 			"vi00", "vi01", "vi02", "vi03",
 			"vi04", "vi05", "vi06", "vi07",
 			"vi08", "vi09", "vi10", "vi11",
@@ -323,12 +321,40 @@ void registers_window(AppState &app)
 			"R", "I", "Q", "c2c23",
 			"c2c24", "c2c25", "TPC", "CMSAR0",
 			"FBRST", "VPU-STAT", "c2c30", "CMSAR1",
-		};
+	};
 	
-		for(int i = 0; i < 32; i++) {
-			ImGui::Text("%s = 0x%x = %hd", integer_register_names[i], regs.VI[i].UL, regs.VI[i].UL);
+	ImGui::BeginTable("Registers", 2, ImGuiTableFlags_SizingStretchProp | ImGuiTableFlags_BordersInnerV |
+										   ImGuiTableFlags_BordersInnerH | ImGuiTableFlags_Resizable);
+
+	for (int i = 0; i < 32; i++) {
+		VECTOR value = regs.VF[i];
+		ImGui::TableNextRow();
+		ImGui::TableSetColumnIndex(0);
+
+		if (show_as_hex) {
+			ImGui::Text("vf%02d = %08x %08x %08x %08x",
+						i, value.UL[0], value.UL[1], value.UL[2], value.UL[3]);
+		} else {
+			ImGui::Text("vf%02d = %.4f %.4f %.4f %.4f",
+						i, value.F[0], value.F[1], value.F[2], value.F[3]);
 		}
-	ImGui::Columns(1);
+
+		ImGui::TableSetColumnIndex(1);
+
+		ImGui::Text("%s = 0x%x = %hd", integer_register_names[i], regs.VI[i].UL, regs.VI[i].UL);
+	}
+
+	ImGui::TableNextRow();
+	ImGui::TableSetColumnIndex(0);
+	if (show_as_hex) {
+		ImGui::Text("ACC = %08x %08x %08x %08x",
+					regs.ACC.UL[0], regs.ACC.UL[1], regs.ACC.UL[2], regs.ACC.UL[3]);
+	} else {
+		ImGui::Text("ACC = %.4f %.4f %.4f %.4f",
+					regs.ACC.F[0], regs.ACC.F[1], regs.ACC.F[2], regs.ACC.F[3]);
+	}
+
+	ImGui::EndTable();
 }
 
 void memory_window(AppState &app)
@@ -344,7 +370,6 @@ void memory_window(AppState &app)
 	static MessageBoxState found_bytes;
 	alert(found_bytes, "Found Bytes");
 	
-	static MessageBoxState find_bytes;
 	if(prompt(find_bytes, "Find Bytes") && !found_bytes.is_open) {
 		std::vector<u8> value_raw = decode_hex(find_bytes.text);
 		for(std::size_t i = 0; i < VU1_MEMSIZE - value_raw.size(); i++) {
@@ -360,8 +385,6 @@ void memory_window(AppState &app)
 		}
 	}
 	
-	ImGui::SameLine();
-	static MessageBoxState save_to_file;
 	if(prompt(save_to_file, "Save to File")) {
 		FILE* dump_file = fopen(save_to_file.text.c_str(), "wb");
 		if(dump_file) {
@@ -372,20 +395,12 @@ void memory_window(AppState &app)
 		}
 	}
 	
-	static int row_size_imgui = 4;
-	static int row_size = 16;
-	ImGui::SameLine();
-	ImGui::PushItemWidth(100);
-	if(ImGui::SliderInt("##rowsize", &row_size_imgui, 1, 8, "Line Width: %d")) {
-		row_size = row_size_imgui * 4;
-	}
-	
-	ImGui::SameLine();
-	ImGui::PushItemWidth(100);
 	static std::string scroll_to_address_str;
 	s32 scroll_to_address = -1;
-	if(ImGui::InputText("Scroll To Address", &scroll_to_address_str)) {
-		scroll_to_address = strtol(scroll_to_address_str.c_str(), NULL, 16);
+
+	if(prompt(go_to_box, "Scroll To Address"))
+	{
+		scroll_to_address = strtol(go_to_box.text.c_str(), NULL, 16);
 	}
 	
 	ImGui::BeginChild("rows_outer");
@@ -459,12 +474,13 @@ void disassembly_window(AppState &app)
 {
 	Snapshot &current = app.snapshots[app.current_snapshot];
 	
-	ImGui::PushItemWidth(ImGui::GetWindowWidth() - 363);
+	ImGui::PushItemWidth(ImGui::GetWindowWidth() - (ImGui::GetWindowWidth() * .75f));
 	ImGui::InputText("Highlight", &app.disassembly_highlight);
 	ImGui::PopItemWidth();
-	ImGui::SameLine();
 	
-	static MessageBoxState export_box;
+	if(prompt(comment_box, "Load Comment File")) {
+		parse_comment_file(app, comment_box.text);
+	}
 	if(prompt(export_box, "Export Disassembly")) {
 		std::ofstream disassembly_out_file(export_box.text);
 		for(std::size_t i = 0; i < VU1_PROGSIZE; i+= INSN_PAIR_SIZE) {
@@ -476,42 +492,39 @@ void disassembly_window(AppState &app)
 			disassembly_out_file << "\n";
 		}
 	}
-	
-	ImGui::SameLine();
-	static MessageBoxState comment_box;
-	if(prompt(comment_box, "Load Comment File")) {
-		parse_comment_file(app, comment_box.text);
-	}
-	
+
 	ImGui::BeginChild("disasm");
-	ImGui::Columns(2);
-	ImGui::SetColumnWidth(0, 768);
-	
+
+	ImGui::BeginTable("Instructions", 2, ImGuiTableFlags_SizingStretchProp | ImGuiTableFlags_BordersInnerV |
+									  ImGuiTableFlags_BordersInnerH | ImGuiTableFlags_Resizable);
+
 	for(std::size_t i = 0; i < VU1_PROGSIZE; i += INSN_PAIR_SIZE) {
+		ImGui::TableNextRow();
+		ImGui::TableSetColumnIndex(0);
 		ImGui::PushID(i);
-		
+
 		Instruction instruction = app.instructions[i / INSN_PAIR_SIZE];
 		bool is_pc = current.registers.VI[TPC].UL == i;
 		ImGuiSelectableFlags flags = instruction.is_executed ?
-			ImGuiSelectableFlags_None :
-			ImGuiSelectableFlags_Disabled;
-		
-		std::string disassembly = disassemble(&current.program[i], i);
-		
+									 ImGuiSelectableFlags_None :
+									 ImGuiSelectableFlags_Disabled;
+
+		std::string disassembly = instruction.disassembly; 
+
 		if(instruction.branch_from_times.size() > 0) {
 			std::stringstream addresses;
 			std::size_t fallthrough_times = app.instructions[i / 8 + 1].times_executed;
 			for(auto addrtimes = instruction.branch_from_times.begin(); addrtimes != instruction.branch_from_times.end(); addrtimes++) {
 				addresses << std::hex << addrtimes->first << " (" << std::dec << addrtimes->second << ") ";
 				fallthrough_times -= addrtimes->second;
-			} 
+			}
 			ImGui::Text("  %s/ ft (%ld) ->", addresses.str().c_str(), fallthrough_times);
 		}
-		
+
 		bool is_highlighted =
-			app.disassembly_highlight.size() > 0 &&
-			disassembly.find(app.disassembly_highlight) != std::string::npos;
-		
+				app.disassembly_highlight.size() > 0 &&
+				disassembly.find(app.disassembly_highlight) != std::string::npos;
+
 		if(is_highlighted) {
 			ImGui::PushStyleColor(ImGuiCol_Text, ImColor(255, 255, 0).Value);
 		}
@@ -519,22 +532,22 @@ void disassembly_window(AppState &app)
 		if(is_highlighted) {
 			ImGui::PopStyleColor();
 		}
-		
+
 		if(instruction.branch_to_times.size() > 0) {
 			std::stringstream addresses;
 			std::size_t fallthrough_times = instruction.times_executed;
 			for(auto addrtimes = instruction.branch_to_times.begin(); addrtimes != instruction.branch_to_times.end(); addrtimes++) {
 				addresses << std::hex << addrtimes->first << " (" << std::dec << addrtimes->second << ") ";
 				fallthrough_times -= addrtimes->second;
-			} 
+			}
 			ImGui::Text("  -> %s/ ft (%ld)", addresses.str().c_str(), fallthrough_times);
 		}
-		
+
 		if(is_pc && app.disassembly_scroll_to) {
 			ImGui::SetScrollHereY(0.5);
 			app.disassembly_scroll_to = false;
 		}
-		
+
 		if(!is_pc && clicked) {
 			bool pc_changed = false;
 			if(current.registers.VI[TPC].UL > i) {
@@ -552,8 +565,9 @@ void disassembly_window(AppState &app)
 				app.disassembly_scroll_to = true;
 			}
 		}
+
+		ImGui::TableSetColumnIndex(1);
 		
-		ImGui::NextColumn();
 		if(!is_pc) {
 			ImGui::PushStyleColor(ImGuiCol_FrameBg, ImVec4(0.f, 0.f, 0.f, 0.f));
 		}
@@ -562,8 +576,8 @@ void disassembly_window(AppState &app)
 		ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(0, 0));
 		ImGui::PushItemWidth(-1);
 		ImGuiInputTextFlags comment_flags = app.comments_loaded ?
-			ImGuiInputTextFlags_None :
-			ImGuiInputTextFlags_ReadOnly;
+											ImGuiInputTextFlags_None :
+											ImGuiInputTextFlags_ReadOnly;
 		if(ImGui::InputText("##comment", &comment, comment_flags)) {
 			save_comment_file(app);
 		}
@@ -572,12 +586,11 @@ void disassembly_window(AppState &app)
 		if(!is_pc) {
 			ImGui::PopStyleColor();
 		}
-		ImGui::NextColumn();
-		
+
 		ImGui::PopID();
 	}
-	
-	ImGui::Columns();
+
+	ImGui::EndTable();
 	ImGui::EndChild();
 }
 
@@ -888,6 +901,10 @@ void parse_trace(AppState &app, std::string trace_file_path)
 	}
 	
 	fclose(trace);
+
+	for(std::size_t i = 0; i < VU1_PROGSIZE; i += INSN_PAIR_SIZE) {
+		app.instructions[i >> 3].disassembly = disassemble(&current.program[i], i);
+	}    
 }
 
 void parse_comment_file(AppState &app, std::string comment_file_path) {
@@ -933,7 +950,8 @@ void init_gui(GLFWwindow **window)
 
 	glfwMaximizeWindow(*window);
 	glfwMakeContextCurrent(*window);
-	glfwSwapInterval(1); // vsync
+	tick_rate = glfwGetVideoMode(glfwGetPrimaryMonitor())->refreshRate / 60;
+	glfwSwapInterval(tick_rate); // vsync
 
 	if(!gladLoadGLLoader((GLADloadproc) glfwGetProcAddress)) {
 		fprintf(stderr, "Cannot load GLAD.");
@@ -943,12 +961,119 @@ void init_gui(GLFWwindow **window)
 	IMGUI_CHECKVERSION();
 	ImGui::CreateContext();
 	ImGuiIO &io = ImGui::GetIO();
+	
+	io.Fonts->AddFontFromMemoryCompressedTTF(&ProggyVectorRegular_compressed_data, ProggyVectorRegular_compressed_size, font_size);
+	
 	io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;
 	io.ConfigFlags |= ImGuiConfigFlags_DockingEnable;
 	io.ConfigDockingWithShift = true;
+	io.FontAllowUserScaling = true;
 	ImGui::StyleColorsDark();
+	
+	io.Fonts->Build();
 	ImGui_ImplGlfw_InitForOpenGL(*window, true);
 	ImGui_ImplOpenGL3_Init("#version 120");
+}
+
+void update_font() {
+	ImGuiIO &io = ImGui::GetIO();
+	
+	io.Fonts->Clear();
+	io.Fonts->ClearFonts();
+
+	if(use_default_font) {
+		default_font_cfg.SizePixels = font_size;
+		io.FontDefault = io.Fonts->AddFontDefault(&default_font_cfg);
+	} else {
+		io.FontDefault = io.Fonts->AddFontFromMemoryCompressedTTF(&ProggyVectorRegular_compressed_data, ProggyVectorRegular_compressed_size, font_size);
+	}
+
+	io.Fonts->Build();
+	ImGui_ImplOpenGL3_CreateFontsTexture();
+	require_font_update = false;
+}
+
+void main_menu_bar() {
+	handle_shortcuts();
+	
+	if (ImGui::BeginMainMenuBar()) {
+		if(ImGui::BeginMenu("File")) {
+			if(ImGui::MenuItem("Load Comments", "Ctrl+L")) {
+				comment_box.is_open = true;
+			}
+			if(ImGui::MenuItem("Export Disassembly", "Ctrl+D")) {
+				export_box.is_open = true;
+			}
+			ImGui::EndMenu();
+		}
+		if(ImGui::BeginMenu("System")) {
+			
+			if(ImGui::SliderInt("##tickrate", &tick_rate, 0, 5, "App Refresh Rate %d")) {
+				
+				glfwSwapInterval(tick_rate);
+			}
+			
+			ImGui::SetItemTooltip("Limits the application's refresh rate to decrease impact on CPU. Assuming a 60Hz monitor, the default value (1) is enough.\n0 is unlimited, 60Hz / 2 = 30fps, 60Hz / 3 = 20fps, etc.");
+			
+			ImGui::EndMenu();
+		}
+		if(ImGui::BeginMenu("Registers")) {
+			if(ImGui::MenuItem("Show as Hex", "Ctrl+Q", show_as_hex)) {
+				show_as_hex = !show_as_hex;
+			}
+			ImGui::EndMenu();
+		}
+		if(ImGui::BeginMenu("Memory")) {
+			if(ImGui::MenuItem("Search", "Ctrl+F")) {
+				find_bytes.is_open = true;
+			}
+			if(ImGui::MenuItem("Dump", "Ctrl+T")) {
+				save_to_file.is_open = true;
+			}
+			if(ImGui::MenuItem("Go To", "Ctrl+G")) {
+				go_to_box.is_open = true;
+			}
+			if(ImGui::SliderInt("##rowsize", &row_size_imgui, 1, 8, "Line Width: %d")) {
+				row_size = row_size_imgui * 4;
+			}
+			ImGui::EndMenu();
+		}
+		if(ImGui::BeginMenu("Font")) {
+			if(ImGui::MenuItem("Use Default", "", use_default_font)) {
+				use_default_font = !use_default_font;
+				require_font_update = true;
+			}
+			if(ImGui::InputFloat("##Size", &font_size, 1.0f, 20.0f, "Size %1.0f")) {
+				require_font_update = true;
+			}
+			ImGui::EndMenu();
+		}
+		
+		ImGui::EndMainMenuBar();
+	}
+}
+
+void handle_shortcuts() {
+	if(ImGui::IsKeyDown(ImGuiKey_LeftCtrl)) {
+		if(ImGui::IsKeyPressed(ImGuiKey_F)) {
+			find_bytes.is_open = !find_bytes.is_open;
+		}
+		if(ImGui::IsKeyPressed(ImGuiKey_T)) {
+			save_to_file.is_open = !save_to_file.is_open;
+		}
+		if(ImGui::IsKeyPressed(ImGuiKey_D)) {
+			export_box.is_open = !export_box.is_open;
+		}
+		if(ImGui::IsKeyPressed(ImGuiKey_L)) {
+			comment_box.is_open = !comment_box.is_open;
+		}
+		if(ImGui::IsKeyPressed(ImGuiKey_G)) {
+			go_to_box.is_open = !go_to_box.is_open;
+		}
+		if(ImGui::IsKeyPressed(ImGuiKey_Q)) {
+			show_as_hex = !show_as_hex;
+		}
+	}
 }
 
 void begin_docking() {
@@ -1020,20 +1145,16 @@ void alert(MessageBoxState &state, const char *title)
 bool prompt(MessageBoxState &state, const char *title)
 {
 	bool result = false;
-	if(ImGui::Button(title)) {
-		state.is_open = true;
-		state.text = "";
-	}
 	if(state.is_open) {
 		ImGui::SetNextWindowSize(ImVec2(400, 100));
-		ImGui::Begin(title);
-		ImGui::InputText("##input", &state.text);
-		if(ImGui::Button("Okay")) {
+		ImGui::Begin(title, &state.is_open);
+		ImGui::InputText("##input", &state.text, ImGuiInputTextFlags_AutoSelectAll);
+		if(ImGui::Button("Okay") || ImGui::IsKeyPressed(ImGuiKey_Enter)) {
 			state.is_open = false;
 			result = true;
 		}
 		ImGui::SameLine();
-		if(ImGui::Button("Cancel")) {
+		if(ImGui::Button("Cancel")  || ImGui::IsKeyPressed(ImGuiKey_Escape)) {
 			state.is_open = false;
 		}
 		ImGui::End();

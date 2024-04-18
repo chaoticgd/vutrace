@@ -61,7 +61,7 @@ where `vu0MicroMem.bin` or `vu1MicroMem.bin` can be extracted from a PCSX2 save 
 ### 2024-04-15
 
 - Revamp UI. [wagrenier](https://github.com/wagrenier)
-- Improve performance by parsing disassembling instructions once on startup. [wagrenier](https://github.com/wagrenier)
+- Improve performance by disassembling instructions once on startup. [wagrenier](https://github.com/wagrenier)
 
 ### 2024-04-04
 

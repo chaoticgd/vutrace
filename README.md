@@ -129,7 +129,7 @@ Push the current snapshot. The parser maintains a single snapshot as the current
 
 Set the registers structure of the current snapshot. Data format:
 
-| Offset | Name | Type | Descriptions |
+| Offset | Name | Type | Description |
 | - | - | - | - |
 | 0x0 | VF | u128[32] | The floating point registers. |
 | 0x200 | VI | u128[32] | The integer registers. |
@@ -151,7 +151,7 @@ Sets the current VU microcode memory for the current snapshot. Data consists of 
 
 Specifies that the lower instruction that executed between the last snapshot and this one loaded a value from VU memory. Data format:
 
-| Offset | Name | Type | Descriptions |
+| Offset | Name | Type | Description |
 | - | - | - | - |
 | 0x0 | address | u32 | Address loaded from (in bytes). |
 | 0x4 | size | u32 | Size of data loaded (in bytes). |
@@ -160,7 +160,7 @@ Specifies that the lower instruction that executed between the last snapshot and
 
 Specifies that the lower instruction that executed between the last snapshot and this one stored a value to VU memory. Note that this does not include DMA. Data format:
 
-| Offset | Name | Type | Descriptions |
+| Offset | Name | Type | Description |
 | - | - | - | - |
 | 0x0 | address | u32 | Address stored to (in bytes). |
 | 0x4 | size | u32 | Size of data stored (in bytes). |
@@ -169,7 +169,7 @@ Specifies that the lower instruction that executed between the last snapshot and
 
 Patch the registers of the current snapshot. Data format:
 
-| Offset | Name | Type | Descriptions |
+| Offset | Name | Type | Description |
 | - | - | - | - |
 | 0x0 | index | u8 | The register index. The `R` data above is treated as a single array of registers. |
 | 0x1 | data | u128 | The contents of the register. |
@@ -178,7 +178,7 @@ Patch the registers of the current snapshot. Data format:
 
 Patch the memory of the current snapshot. Data format:
 
-| Offset | Name | Type | Descriptions |
+| Offset | Name | Type | Description |
 | - | - | - | - |
 | 0x0 | offset | u16 | VU memory address (in bytes). |
 | 0x2 | data | u32 | Data to be written. |
